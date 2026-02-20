@@ -1,100 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getResult, getExam } from '../services/firestoreService';
 import { useAuth } from '../hooks/useAuth';
 import { type Result as ResultType } from '../types/result';
 import { type Exam as ExamType, type Question } from '../types/exam';
 import { Loader } from '../components/common/Loader';
-
-const ResultsContainer = styled.div`
-  padding: ${(props) => props.theme.spacing.large};
-  max-width: 800px;
-  margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  color: ${(props) => props.theme.colors.dark};
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-`;
-
-const Summary = styled.div`
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  padding: ${(props) => props.theme.spacing.large};
-  margin-bottom: ${(props) => props.theme.spacing.large};
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: ${(props) => props.theme.spacing.medium};
-`;
-
-const SummaryItem = styled.div`
-  text-align: center;
-  & > h3 {
-    margin-bottom: ${(props) => props.theme.spacing.small};
-    color: ${(props) => props.theme.colors.dark};
-  }
-  & > p {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: ${(props) => props.theme.colors.primary};
-  }
-`;
-
-const ReportContainer = styled.div``;
-
-const ReportTitle = styled.h2`
-  color: ${(props) => props.theme.colors.dark};
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-  border-bottom: 2px solid ${(props) => props.theme.colors.primary};
-  padding-bottom: ${(props) => props.theme.spacing.small};
-`;
-
-const QuestionResult = styled.div<{ isCorrect: boolean }>`
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-  padding: ${(props) => props.theme.spacing.medium};
-  border: 1px solid ${(props) => (props.isCorrect ? props.theme.colors.success : props.theme.colors.danger)};
-  border-left-width: 5px;
-  border-radius: 8px;
-  background-color: #fff;
-`;
-
-const QuestionText = styled.p`
-  font-weight: bold;
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-`;
-
-const AnswerText = styled.p<{ isCorrect?: boolean; isUserAnswer?: boolean }>`
-  margin-bottom: ${(props) => props.theme.spacing.small};
-  color: ${({ isCorrect, isUserAnswer, theme }) => {
-    if (isUserAnswer) return isCorrect ? theme.colors.success : theme.colors.danger;
-    return theme.colors.dark;
-  }};
-`;
-
-const Explanation = styled.p`
-  margin-top: ${(props) => props.theme.spacing.small};
-  padding-top: ${(props) => props.theme.spacing.small};
-  border-top: 1px solid #eee;
-  font-style: italic;
-  color: #555;
-`;
-
-const BackButton = styled(Link)`
-  display: inline-block;
-  margin-top: ${(props) => props.theme.spacing.large};
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.white};
-  padding: ${(props) => props.theme.spacing.medium};
-  border-radius: 8px;
-  text-decoration: none;
-  text-align: center;
-  transition: background-color 0.3s;
-
-  &:hover {
-    background-color: ${(props) => props.theme.colors.secondary};
-  }
-`;
+import {
+  Container,
+  Typography,
+  Paper,
+  Grid,
+  Box,
+  Card,
+  CardContent,
+  Button,
+  Divider
+} from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 export const Results: React.FC = () => {
   const { id: resultId } = useParams<{ id: string }>();
@@ -148,7 +71,7 @@ export const Results: React.FC = () => {
   }
 
   if (error) {
-    return <ResultsContainer><h1>{error}</h1></ResultsContainer>;
+    return <Container><Typography color="error">{error}</Typography></Container>;
   }
 
   if (!result || !exam) {
@@ -166,31 +89,41 @@ export const Results: React.FC = () => {
   }
 
   return (
-    <ResultsContainer>
-      <Title>Resultados do Simulado: {exam.title}</Title>
-      
-      <Summary>
-        <SummaryItem>
-          <h3>Pontuação</h3>
-          <p>{result.score.toFixed(1)}%</p>
-        </SummaryItem>
-        <SummaryItem>
-          <h3>Acertos</h3>
-          <p>{result.answers.filter(a => a.isCorrect).length} / {exam.questions.length}</p>
-        </SummaryItem>
-        <SummaryItem>
-          <h3>Tempo Gasto</h3>
-          <p>{formatTime(result.timeTaken)}</p>
-        </SummaryItem>
-         <SummaryItem>
-          <h3>Data</h3>
-          <p>{new Date(result.completedAt).toLocaleDateString()}</p>
-        </SummaryItem>
-      </Summary>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Resultados do Simulado: {exam.title}
+      </Typography>
 
-      <ReportContainer>
-        <ReportTitle>Relatório Detalhado</ReportTitle>
-        {result.answers.map((answer) => {
+      <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+        <Grid container spacing={2} textAlign="center">
+          <Grid item xs={6} sm={3}>
+            <Typography variant="h6">Pontuação</Typography>
+            <Typography variant="h4" color="primary">{result.score.toFixed(1)}%</Typography>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Typography variant="h6">Acertos</Typography>
+            <Typography variant="h4" color="primary">
+              {result.answers.filter(a => a.isCorrect).length} / {exam.questions.length}
+            </Typography>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Typography variant="h6">Tempo Gasto</Typography>
+            <Typography variant="h4" color="primary">{formatTime(result.timeTaken)}</Typography>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Typography variant="h6">Data</Typography>
+            <Typography variant="h4" color="primary">{new Date(result.completedAt).toLocaleDateString()}</Typography>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Typography variant="h5" component="h2" gutterBottom>
+        Relatório Detalhado
+      </Typography>
+      <Divider sx={{ mb: 2 }} />
+      
+      <Box>
+        {result.answers.map((answer, index) => {
           const question = findQuestionById(answer.questionId);
           if (!question) return null;
 
@@ -198,22 +131,35 @@ export const Results: React.FC = () => {
           const correctAnswerText = question.options[question.correctAnswer];
 
           return (
-            <QuestionResult key={question.id} isCorrect={answer.isCorrect}>
-              <QuestionText>{question.question}</QuestionText>
-              <AnswerText isUserAnswer isCorrect={answer.isCorrect}>Sua resposta: {userAnswerText}</AnswerText>
-              {!answer.isCorrect && (
-                <AnswerText>Resposta correta: {correctAnswerText}</AnswerText>
-              )}
-              {question.explanation && (
-                <Explanation><strong>Explicação:</strong> {question.explanation}</Explanation>
-              )}
-            </QuestionResult>
+            <Card key={question.id} sx={{ mb: 2, borderLeft: 5, borderColor: answer.isCorrect ? 'success.main' : 'error.main' }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>{index + 1}. {question.question}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  {answer.isCorrect ? <CheckCircleIcon color="success" sx={{ mr: 1 }} /> : <CancelIcon color="error" sx={{ mr: 1 }} />}
+                  <Typography color={answer.isCorrect ? 'success.main' : 'error.main'}>
+                    Sua resposta: {userAnswerText}
+                  </Typography>
+                </Box>
+                {!answer.isCorrect && (
+                  <Typography color="text.secondary">
+                    Resposta correta: {correctAnswerText}
+                  </Typography>
+                )}
+                {question.explanation && (
+                  <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic', color: 'text.secondary' }}>
+                    <strong>Explicação:</strong> {question.explanation}
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
           );
         })}
-      </ReportContainer>
+      </Box>
 
-      <BackButton to="/dashboard">Voltar para o Dashboard</BackButton>
-    </ResultsContainer>
+      <Button component={Link} to="/dashboard" variant="contained" sx={{ mt: 4 }}>
+        Voltar para o Dashboard
+      </Button>
+    </Container>
   );
 };
 

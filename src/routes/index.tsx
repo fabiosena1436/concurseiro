@@ -8,6 +8,7 @@ import { Results } from "../pages/Results";
 import { Login } from "../pages/Login";
 import { Signup } from "../pages/Signup";
 import { ProtectedRoute } from "../components/common/ProtectedRoute";
+import { About } from "../pages/About";
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +18,10 @@ export const router = createBrowserRouter([
       {
         path: "/",
         element: <Home />,
+      },
+      {
+        path: "/about",
+        element: <About />,
       },
       {
         path: "/login",

@@ -1,82 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 import { auth } from '../services/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../hooks/useAuth';
 import { Loader } from '../components/common/Loader';
-
-const AuthContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: ${(props) => props.theme.spacing.large};
-  min-height: 80vh;
-`;
-
-const AuthBox = styled.div`
-  width: 100%;
-  max-width: 400px;
-  padding: ${(props) => props.theme.spacing.large};
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-`;
-
-const Title = styled.h1`
-  color: ${(props) => props.theme.colors.dark};
-  margin-bottom: ${(props) => props.theme.spacing.large};
-  text-align: center;
-`;
-
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: ${(props) => props.theme.spacing.medium};
-`;
-
-const Input = styled.input`
-  padding: ${(props) => props.theme.spacing.medium};
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  font-size: 1rem;
-`;
-
-const Button = styled.button`
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.white};
-  padding: ${(props) => props.theme.spacing.medium};
-  border-radius: 8px;
-  font-size: 1.1rem;
-  cursor: pointer;
-  border: none;
-  transition: background-color 0.3s;
-
-  &:hover {
-    background-color: ${(props) => props.theme.colors.secondary};
-  }
-
-  &:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-  }
-`;
-
-const ErrorMessage = styled.p`
-  color: ${(props) => props.theme.colors.danger};
-  text-align: center;
-`;
-
-const RedirectLink = styled.p`
-  text-align: center;
-  margin-top: ${(props) => props.theme.spacing.medium};
-
-  a {
-    color: ${(props) => props.theme.colors.primary};
-    text-decoration: none;
-    font-weight: bold;
-  }
-`;
+import { Container, Box, Typography, TextField, Button, Link as MuiLink } from '@mui/material';
 
 export const Signup: React.FC = () => {
     const navigate = useNavigate();
@@ -123,41 +51,76 @@ export const Signup: React.FC = () => {
     }
 
     return (
-        <AuthContainer>
-            <AuthBox>
-                <Title>Criar Conta</Title>
-                <Form onSubmit={handleSignup}>
-                    <Input
-                        type="email"
-                        placeholder="Seu e-mail"
+        <Container component="main" maxWidth="xs">
+            <Box
+                sx={{
+                    marginTop: 8,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                }}
+            >
+                <Typography component="h1" variant="h5">
+                    Criar Conta
+                </Typography>
+                <Box component="form" onSubmit={handleSignup} sx={{ mt: 1 }}>
+                    <TextField
+                        margin="normal"
+                        required
+                        fullWidth
+                        id="email"
+                        label="Seu e-mail"
+                        name="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        required
                     />
-                    <Input
+                    <TextField
+                        margin="normal"
+                        required
+                        fullWidth
+                        name="password"
+                        label="Sua senha"
                         type="password"
-                        placeholder="Sua senha"
+                        id="password"
+                        autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        required
                     />
-                    <Input
+                    <TextField
+                        margin="normal"
+                        required
+                        fullWidth
+                        name="confirmPassword"
+                        label="Confirme sua senha"
                         type="password"
-                        placeholder="Confirme sua senha"
+                        id="confirmPassword"
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
                     />
-                    {error && <ErrorMessage>{error}</ErrorMessage>}
-                    <Button type="submit" disabled={isSubmitting}>
+                    {error && (
+                        <Typography color="error" align="center">
+                            {error}
+                        </Typography>
+                    )}
+                    <Button
+                        type="submit"
+                        fullWidth
+                        variant="contained"
+                        sx={{ mt: 3, mb: 2 }}
+                        disabled={isSubmitting}
+                    >
                         {isSubmitting ? 'Criando...' : 'Criar Conta'}
                     </Button>
-                </Form>
-                <RedirectLink>
-                    Já tem uma conta? <Link to="/login">Faça login</Link>
-                </RedirectLink>
-            </AuthBox>
-        </AuthContainer>
+                    <Typography align="center">
+                        Já tem uma conta?{' '}
+                        <MuiLink component={Link} to="/login" variant="body2">
+                            Faça login
+                        </MuiLink>
+                    </Typography>
+                </Box>
+            </Box>
+        </Container>
     );
 };
-

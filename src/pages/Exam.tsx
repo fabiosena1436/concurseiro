@@ -1,122 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import styled from 'styled-components';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getExam, saveResult } from '../services/firestoreService';
 import { useAuth } from '../hooks/useAuth';
-import { type Exam as ExamType, type Question, type UserAnswer } from '../types/exam';
-import { Loader } from '../components/common/Loader'; // Um novo componente que você pode criar
-
-const ExamContainer = styled.div`
-  padding: ${(props) => props.theme.spacing.large};
-  max-width: 900px;
-  margin: 0 auto;
-`;
-
-const Title = styled.h1`
-  color: ${(props) => props.theme.colors.dark};
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-`;
-
-const ExamHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: ${(props) => props.theme.spacing.large};
-`;
-
-const Timer = styled.div`
-  font-size: 1.2rem;
-  font-weight: bold;
-`;
-
-const QuestionCard = styled.div`
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: ${(props) => props.theme.spacing.large};
-`;
-
-const QuestionText = styled.p`
-  font-size: 1.2rem;
-  margin-bottom: ${(props) => props.theme.spacing.medium};
-`;
-
-const OptionsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${(props) => props.theme.spacing.small};
-`;
-
-const OptionLabel = styled.label<{ isSelected: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${(props) => props.theme.spacing.small};
-  cursor: pointer;
-  padding: ${(props) => props.theme.spacing.medium};
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: ${(props) => (props.isSelected ? '#e7f3ff' : 'transparent')};
-  border-color: ${(props) => (props.isSelected ? props.theme.colors.primary : '#ddd')};
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: ${(props) => props.theme.colors.secondary};
-  }
-`;
-
-const Navigation = styled.div`
-  display: flex;
-  justify-content: space-between;
-  margin-top: ${(props) => props.theme.spacing.large};
-`;
-
-const NavButton = styled.button`
-  background-color: ${(props) => props.theme.colors.primary};
-  color: ${(props) => props.theme.colors.white};
-  padding: ${(props) => props.theme.spacing.small} ${(props) => props.theme.spacing.medium};
-  border-radius: 4px;
-  cursor: pointer;
-  border: none;
-
-  &:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-  }
-`;
-
-const FinishButton = styled(NavButton)`
-  background-color: ${(props) => props.theme.colors.success};
-  &:hover { background-color: #218838; }
-`;
-
-const MarkReviewButton = styled(NavButton)`
-  background-color: ${(props) => props.theme.colors.warning};
-   &:hover { background-color: #e0a800; }
-`;
-
-const QuestionGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-  gap: ${(props) => props.theme.spacing.small};
-  margin-top: ${(props) => props.theme.spacing.large};
-`;
-
-const QuestionGridItem = styled.div<{ status: 'answered' | 'marked' | 'unvisited' }>`
-  width: 40px;
-  height: 40px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: ${({ status, theme }) => {
-    if (status === 'answered') return theme.colors.success;
-    if (status === 'marked') return theme.colors.warning;
-    return 'white';
-  }};
-  color: ${({ status }) => (status === 'unvisited' ? 'black' : 'white')};
-`;
-
+import { type Exam as ExamType, type UserAnswer } from '../types/exam';
+import { Loader } from '../components/common/Loader';
+import {
+  Container,
+  Typography,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  FormControl,
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  Grid,
+  Chip,
+  CircularProgress,
+  Paper
+} from '@mui/material';
 
 export const Exam: React.FC = () => {
   const { id: examId } = useParams<{ id: string }>();
@@ -161,7 +64,6 @@ export const Exam: React.FC = () => {
     fetchExam();
   }, [examId, navigate]);
 
-  // Timer effect
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
@@ -186,13 +88,13 @@ export const Exam: React.FC = () => {
   };
 
   const toggleMarkForReview = (questionId: string) => {
-    setMarkedForReview(prev => 
-      prev.includes(questionId) 
+    setMarkedForReview(prev =>
+      prev.includes(questionId)
         ? prev.filter(id => id !== questionId)
         : [...prev, questionId]
     );
   };
-  
+
   const handleFinishExam = async () => {
     if (!exam || !user) return;
 
@@ -225,7 +127,7 @@ export const Exam: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -236,71 +138,83 @@ export const Exam: React.FC = () => {
   const currentQuestion = useMemo(() => exam?.questions[currentQuestionIndex], [exam, currentQuestionIndex]);
 
   if (isLoading) return <Loader>Carregando simulado...</Loader>;
-  if (error) return <ExamContainer><h1>{error}</h1></ExamContainer>;
+  if (error) return <Container><Typography color="error">{error}</Typography></Container>;
   if (!exam || !currentQuestion) return null;
 
   return (
-    <ExamContainer>
-      <ExamHeader>
-        <Title>{exam.title}</Title>
-        <Timer>Tempo: {formatTime(timeLeft)}</Timer>
-      </ExamHeader>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">{exam.title}</Typography>
+        <Chip label={`Tempo: ${formatTime(timeLeft)}`} color="secondary" />
+      </Box>
 
-      <QuestionCard>
-        <QuestionText>{currentQuestionIndex + 1}. {currentQuestion.question}</QuestionText>
-        <OptionsContainer>
-          {currentQuestion.options.map((option, index) => (
-            <OptionLabel key={index} isSelected={userAnswers[currentQuestion.id] === index}>
-              <input
-                type="radio"
-                name={currentQuestion.id}
-                value={index}
-                checked={userAnswers[currentQuestion.id] === index}
-                onChange={() => handleAnswerChange(currentQuestion.id, index)}
-                style={{ display: 'none' }}
-              />
-              <span>{option}</span>
-            </OptionLabel>
-          ))}
-        </OptionsContainer>
-      </QuestionCard>
+      <Card component={Paper} elevation={3}>
+        <CardContent>
+          <Typography variant="h6" component="p" sx={{ mb: 2 }}>
+            {currentQuestionIndex + 1}. {currentQuestion.question}
+          </Typography>
+          <FormControl component="fieldset">
+            <RadioGroup
+              name={currentQuestion.id}
+              value={userAnswers[currentQuestion.id] ?? ''}
+              onChange={(e) => handleAnswerChange(currentQuestion.id, parseInt(e.target.value))}
+            >
+              {currentQuestion.options.map((option, index) => (
+                <FormControlLabel key={index} value={index} control={<Radio />} label={option} />
+              ))}
+            </RadioGroup>
+          </FormControl>
+        </CardContent>
+      </Card>
 
-      <Navigation>
-        <NavButton onClick={handlePrev} disabled={currentQuestionIndex === 0}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+        <Button
+          variant="outlined"
+          onClick={handlePrev}
+          disabled={currentQuestionIndex === 0}
+        >
           Anterior
-        </NavButton>
-        <MarkReviewButton onClick={() => toggleMarkForReview(currentQuestion.id)}>
+        </Button>
+        <Button
+          variant="outlined"
+          color={markedForReview.includes(currentQuestion.id) ? 'secondary' : 'primary'}
+          onClick={() => toggleMarkForReview(currentQuestion.id)}
+        >
           {markedForReview.includes(currentQuestion.id) ? 'Desmarcar' : 'Marcar para Revisão'}
-        </MarkReviewButton>
+        </Button>
         {currentQuestionIndex < exam.questions.length - 1 ? (
-          <NavButton onClick={handleNext}>
+          <Button variant="contained" onClick={handleNext}>
             Próxima
-          </NavButton>
+          </Button>
         ) : (
-          <FinishButton onClick={handleFinishExam} disabled={isSubmitting}>
-            {isSubmitting ? 'Finalizando...' : 'Finalizar Simulado'}
-          </FinishButton>
+          <Button variant="contained" color="success" onClick={handleFinishExam} disabled={isSubmitting}>
+            {isSubmitting ? <CircularProgress size={24} /> : 'Finalizar Simulado'}
+          </Button>
         )}
-      </Navigation>
+      </Box>
 
-      <QuestionGrid>
-        {exam.questions.map((q, index) => (
-          <QuestionGridItem 
-            key={q.id}
-            onClick={() => setCurrentQuestionIndex(index)}
-            status={
-              userAnswers[q.id] !== undefined 
-                ? 'answered' 
-                : markedForReview.includes(q.id) 
-                ? 'marked' 
-                : 'unvisited'
-            }
-          >
-            {index + 1}
-          </QuestionGridItem>
-        ))}
-      </QuestionGrid>
-    </ExamContainer>
+      <Paper elevation={2} sx={{ p: 2, mt: 4 }}>
+        <Typography variant="h6" gutterBottom>Navegação</Typography>
+        <Grid container spacing={1}>
+          {exam.questions.map((q, index) => (
+            <Grid item key={q.id}>
+              <Chip
+                label={index + 1}
+                clickable
+                onClick={() => setCurrentQuestionIndex(index)}
+                color={
+                  userAnswers[q.id] !== undefined
+                    ? 'primary'
+                    : markedForReview.includes(q.id)
+                    ? 'secondary'
+                    : 'default'
+                }
+                variant={currentQuestionIndex === index ? 'filled' : 'outlined'}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      </Paper>
+    </Container>
   );
 };
-
