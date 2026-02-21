@@ -1,17 +1,75 @@
-import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { auth } from '../../services/firebase';
+import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, IconButton, Drawer, List, ListItem, ListItemText } from '@mui/material';
+import React,
+{
+  useState
+} from 'react';
+import {
+  Link,
+  useNavigate
+} from 'react-router-dom';
+import {
+  useAuth
+} from '../../hooks/useAuth';
+import {
+  auth
+} from '../../services/firebase';
+import MenuIcon from '@mui/icons-material/Menu';
+import {
+  useTheme
+} from '@mui/material/styles';
+
 
 export const Header: React.FC = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
+  const {
+    user,
+    userData
+  } = useAuth();
+  const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-    const handleLogout = async () => {
-        await auth.signOut();
-        navigate('/');
-    }
+  const handleLogout = async () => {
+    await auth.signOut();
+    navigate('/');
+  }
+
+  const handleDrawerToggle = () => {
+    setDrawerOpen(!drawerOpen);
+  };
+
+  const menuItems = (
+    <>
+      <ListItem button component={Link} to="/" onClick={handleDrawerToggle}>
+        <ListItemText primary="Início" />
+      </ListItem>
+      <ListItem button component={Link} to="/about" onClick={handleDrawerToggle}>
+        <ListItemText primary="Sobre" />
+      </ListItem>
+      {user && (
+        <ListItem button component={Link} to="/dashboard" onClick={handleDrawerToggle}>
+          <ListItemText primary="Dashboard" />
+        </ListItem>
+      )}
+      <ListItem button component={Link} to="/criar-simulado" onClick={handleDrawerToggle}>
+        <ListItemText primary="Criar Simulado" />
+      </ListItem>
+      {user ? (
+        <>
+          <ListItem>
+            <ListItemText primary={userData?.socialName || user.email} />
+          </ListItem>
+          <ListItem button onClick={() => { handleLogout(); handleDrawerToggle(); }}>
+            <ListItemText primary="Sair" />
+          </ListItem>
+        </>
+      ) : (
+        <ListItem button component={Link} to="/login" onClick={handleDrawerToggle}>
+          <ListItemText primary="Login" />
+        </ListItem>
+      )}
+    </>
+  );
 
   return (
     <AppBar position="static">
@@ -21,34 +79,63 @@ export const Header: React.FC = () => {
             Simulado Concurso
           </Link>
         </Typography>
-        <Box>
-          <Button color="inherit" component={Link} to="/">
-            Início
-          </Button>
-          <Button color="inherit" component={Link} to="/about">
-            Sobre
-          </Button>
-          {user && (
-            <Button color="inherit" component={Link} to="/dashboard">
-              Dashboard
+        {isMobile ? (
+          <>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Drawer
+              anchor="right"
+              open={drawerOpen}
+              onClose={handleDrawerToggle}
+            >
+              <Box
+                sx={{ width: 250 }}
+                role="presentation"
+                onClick={handleDrawerToggle}
+                onKeyDown={handleDrawerToggle}
+              >
+                <List>
+                  {menuItems}
+                </List>
+              </Box>
+            </Drawer>
+          </>
+        ) : (
+          <Box>
+            <Button color="inherit" component={Link} to="/">
+              Início
             </Button>
-          )}
-          <Button color="inherit" component={Link} to="/criar-simulado">
-            Criar Simulado
-          </Button>
-          {user ? (
-            <>
-              <Button color="inherit">{user.email}</Button>
-              <Button color="inherit" onClick={handleLogout}>
-                Sair
+            <Button color="inherit" component={Link} to="/about">
+              Sobre
+            </Button>
+            {user && (
+              <Button color="inherit" component={Link} to="/dashboard">
+                Dashboard
               </Button>
-            </>
-          ) : (
-            <Button color="inherit" component={Link} to="/login">
-              Login
+            )}
+            <Button color="inherit" component={Link} to="/criar-simulado">
+              Criar Simulado
             </Button>
-          )}
-        </Box>
+            {user ? (
+              <>
+                <Button color="inherit">{userData?.socialName || user.email}</Button>
+                <Button color="inherit" onClick={handleLogout}>
+                  Sair
+                </Button>
+              </>
+            ) : (
+              <Button color="inherit" component={Link} to="/login">
+                Login
+              </Button>
+            )}
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
   );

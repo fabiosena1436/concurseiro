@@ -8,6 +8,7 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Exam } from "../types/exam";
@@ -108,4 +109,13 @@ export const getResultsForUser = async (userId: string): Promise<Result[]> => {
       completedAt: data.completedAt.toDate(),
     } as Result;
   });
+};
+
+/**
+ * Deleta um resultado do Firestore.
+ * @param resultId - O ID do resultado a ser deletado.
+ */
+export const deleteResult = async (resultId: string): Promise<void> => {
+  const docRef = doc(db, "results", resultId);
+  await deleteDoc(docRef);
 };

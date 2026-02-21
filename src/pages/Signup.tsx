@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { Loader } from '../components/common/Loader';
 import { Container, Box, Typography, TextField, Button, Link as MuiLink } from '@mui/material';
@@ -9,6 +10,9 @@ import { Container, Box, Typography, TextField, Button, Link as MuiLink } from '
 export const Signup: React.FC = () => {
     const navigate = useNavigate();
     const { user, loading } = useAuth();
+    const [name, setName] = useState('');
+    const [socialName, setSocialName] = useState('');
+    const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,7 +34,17 @@ export const Signup: React.FC = () => {
         setIsSubmitting(true);
         setError(null);
         try {
-            await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const firebaseUser = userCredential.user;
+            if (firebaseUser) {
+                await setDoc(doc(db, "users", firebaseUser.uid), {
+                    uid: firebaseUser.uid,
+                    name,
+                    socialName,
+                    phone,
+                    email: firebaseUser.email,
+                });
+            }
             navigate('/dashboard');
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
@@ -64,6 +78,37 @@ export const Signup: React.FC = () => {
                     Criar Conta
                 </Typography>
                 <Box component="form" onSubmit={handleSignup} sx={{ mt: 1 }}>
+                    <TextField
+                        margin="normal"
+                        required
+                        fullWidth
+                        id="name"
+                        label="Nome Completo"
+                        name="name"
+                        autoComplete="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        id="socialName"
+                        label="Nome Social"
+                        name="socialName"
+                        autoComplete="nickname"
+                        value={socialName}
+                        onChange={(e) => setSocialName(e.target.value)}
+                    />
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        id="phone"
+                        label="Telefone"
+                        name="phone"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                    />
                     <TextField
                         margin="normal"
                         required

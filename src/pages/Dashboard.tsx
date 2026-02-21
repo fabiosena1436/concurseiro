@@ -86,10 +86,16 @@ export const Dashboard: React.FC = () => {
               {results.map((result, index) => (
                 <ListItem
                   key={result.id}
-                  button
-                  component={Link}
-                  to={`/resultados/${result.id}`}
                   divider={index < results.length - 1}
+                  secondaryAction={
+                    <Button
+                      component={Link}
+                      to={`/resultados/${result.id}`}
+                      variant="outlined"
+                    >
+                      Ver
+                    </Button>
+                  }
                 >
                   <ListItemText
                     primary={result.examTitle}

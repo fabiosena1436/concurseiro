@@ -26,12 +26,23 @@ const bancas = [
     "Outra"
 ];
 
+const subjects: (Subject | 'outra')[] = [
+    "portugues",
+    "matematica",
+    "informatica",
+    "direito",
+    "outra"
+];
+
+
 export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
-  const [subject, setSubject] = useState<Subject>('portugues');
+  const [subject, setSubject] = useState<Subject | 'outra'>('portugues');
+  const [customSubject, setCustomSubject] = useState('');
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
+  const [editalContent, setEditalContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,8 +54,10 @@ export const ExamCreator: React.FC = () => {
       setError("Você precisa estar logado para criar um simulado.");
       return;
     }
-    if (!subject) {
-      setError("Por favor, selecione uma matéria.");
+    
+    const finalSubject = subject === 'outra' ? customSubject : subject;
+    if (!finalSubject) {
+      setError("Por favor, selecione ou digite uma matéria.");
       return;
     }
 
@@ -57,7 +70,7 @@ export const ExamCreator: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const questionsToUse = await generateQuestionsFromBank(subject, numQuestions, finalBanca);
+      const questionsToUse = await generateQuestionsFromBank(finalSubject, numQuestions, finalBanca, editalContent);
 
       if (questionsToUse.length === 0) {
         setError("Não há questões disponíveis para os critérios selecionados.");
@@ -66,7 +79,7 @@ export const ExamCreator: React.FC = () => {
       }
 
       const examData = {
-        title: `Simulado de ${subject.charAt(0).toUpperCase() + subject.slice(1)}`,
+        title: `Simulado de ${finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`,
         creatorId: auth.currentUser.uid,
         questions: questionsToUse,
         banca: finalBanca,
@@ -97,15 +110,25 @@ export const ExamCreator: React.FC = () => {
             id="subject"
             value={subject}
             label="Matéria"
-            onChange={(e) => setSubject(e.target.value as Subject)}
+            onChange={(e) => setSubject(e.target.value as Subject | 'outra')}
             required
           >
-            <MenuItem value="portugues">Português</MenuItem>
-            <MenuItem value="matematica">Matemática</MenuItem>
-            <MenuItem value="informatica">Informática</MenuItem>
-            <MenuItem value="direito">Direito</MenuItem>
+            {subjects.map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}
           </Select>
         </FormControl>
+
+        {subject === 'outra' && (
+          <TextField
+            fullWidth
+            margin="normal"
+            id="customSubject"
+            label="Qual matéria?"
+            value={customSubject}
+            onChange={(e) => setCustomSubject(e.target.value)}
+            placeholder="Digite o nome da matéria"
+            required
+          />
+        )}
 
         <FormControl fullWidth margin="normal">
           <InputLabel id="banca-label">Banca Examinadora</InputLabel>
@@ -143,6 +166,18 @@ export const ExamCreator: React.FC = () => {
           value={numQuestions}
           onChange={(e) => setNumQuestions(parseInt(e.target.value, 10))}
           InputProps={{ inputProps: { min: 1, max: 50 } }}
+        />
+        
+        <TextField
+            fullWidth
+            margin="normal"
+            id="editalContent"
+            label="Conteúdo do Edital (Opcional)"
+            multiline
+            rows={6}
+            value={editalContent}
+            onChange={(e) => setEditalContent(e.target.value)}
+            placeholder="Cole aqui o conteúdo do edital para gerar questões específicas."
         />
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import type { UserProfile } from '../types/user';
 
 export const useAuth = () => {
     const [user, setUser] = useState<User | null>(null);
+    const [userData, setUserData] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setUser(user);
+            if (user) {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    setUserData(userDocSnap.data() as UserProfile);
+                }
+            } else {
+                setUserData(null);
+            }
             setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
-    return { user, loading };
+    return { user, userData, loading };
 };

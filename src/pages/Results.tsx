@@ -156,10 +156,14 @@ export const Results: React.FC = () => {
         })}
       </Box>
 
-      <Button component={Link} to="/dashboard" variant="contained" sx={{ mt: 4 }}>
-        Voltar para o Dashboard
-      </Button>
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
+        <Button component={Link} to="/dashboard" variant="outlined">
+          Voltar para o Dashboard
+        </Button>
+        <Button component={Link} to={`/simulado/${result.examId}`} variant="contained">
+          Responder Novamente
+        </Button>
+      </Box>
     </Container>
   );
 };
-

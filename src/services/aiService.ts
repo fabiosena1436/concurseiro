@@ -20,13 +20,15 @@ const openai = new OpenAI({
 export const generateQuestionsFromBank = async (
   subject: Subject,
   numQuestions: number,
-  banca: string
+  banca: string,
+  editalContent?: string
 ): Promise<Question[]> => {
 
   // 1. Construir o prompt detalhado para a IA
   const prompt = `
     Por favor, gere ${numQuestions} questões de concurso sobre o tópico "${subject}".
     As questões devem seguir o estilo e o nível de dificuldade da banca examinadora: "${banca}".
+    ${editalContent ? `\nBaseie-se no seguinte conteúdo do edital:\n${editalContent}` : ''}
     
     Para cada questão, forneça:
     - O texto da pergunta (question).
@@ -106,3 +108,4 @@ export const generateQuestionsFromBank = async (
     return Array(numQuestions).fill(fallbackQuestion).map((q, i) => ({...q, id: `error-${i}`}));
   }
 };
+

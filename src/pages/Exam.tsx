@@ -18,7 +18,8 @@ import {
   Grid,
   Chip,
   CircularProgress,
-  Paper
+  Paper,
+  FormHelperText
 } from '@mui/material';
 
 export const Exam: React.FC = () => {
@@ -35,6 +36,7 @@ export const Exam: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [startTime, setStartTime] = useState(Date.now());
   const [timeLeft, setTimeLeft] = useState(3600); // 1 hora
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     if (!examId) {
@@ -72,18 +74,25 @@ export const Exam: React.FC = () => {
   }, []);
 
   const handleAnswerChange = (questionId: string, optionIndex: number) => {
+    if (showFeedback) return;
     setUserAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
   };
+
+  const handleCorrect = () => {
+    setShowFeedback(true);
+  }
 
   const handleNext = () => {
     if (exam && currentQuestionIndex < exam.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setShowFeedback(false);
     }
   };
 
   const handlePrev = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setShowFeedback(false);
     }
   };
 
@@ -141,6 +150,10 @@ export const Exam: React.FC = () => {
   if (error) return <Container><Typography color="error">{error}</Typography></Container>;
   if (!exam || !currentQuestion) return null;
 
+  const selectedAnswer = userAnswers[currentQuestion.id];
+  const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -153,17 +166,35 @@ export const Exam: React.FC = () => {
           <Typography variant="h6" component="p" sx={{ mb: 2 }}>
             {currentQuestionIndex + 1}. {currentQuestion.question}
           </Typography>
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" disabled={showFeedback}>
             <RadioGroup
               name={currentQuestion.id}
               value={userAnswers[currentQuestion.id] ?? ''}
               onChange={(e) => handleAnswerChange(currentQuestion.id, parseInt(e.target.value))}
             >
               {currentQuestion.options.map((option, index) => (
-                <FormControlLabel key={index} value={index} control={<Radio />} label={option} />
+                <FormControlLabel 
+                  key={index} 
+                  value={index} 
+                  control={<Radio />} 
+                  label={option}
+                  sx={{
+                    color: showFeedback && index === currentQuestion.correctAnswer ? 'success.main' : (showFeedback && index === selectedAnswer && !isCorrect ? 'error.main' : 'inherit'),
+                  }}
+                />
               ))}
             </RadioGroup>
           </FormControl>
+           {showFeedback && (
+              <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                <Typography variant="body1" color={isCorrect ? 'success.main' : 'error.main'}>
+                  {isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta.'}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  <strong>Explicação:</strong> {currentQuestion.explanation}
+                </Typography>
+              </Box>
+            )}
         </CardContent>
       </Card>
 
@@ -182,13 +213,19 @@ export const Exam: React.FC = () => {
         >
           {markedForReview.includes(currentQuestion.id) ? 'Desmarcar' : 'Marcar para Revisão'}
         </Button>
-        {currentQuestionIndex < exam.questions.length - 1 ? (
-          <Button variant="contained" onClick={handleNext}>
-            Próxima
-          </Button>
+        {showFeedback ? (
+            currentQuestionIndex < exam.questions.length - 1 ? (
+              <Button variant="contained" onClick={handleNext}>
+                Próxima
+              </Button>
+            ) : (
+              <Button variant="contained" color="success" onClick={handleFinishExam} disabled={isSubmitting}>
+                {isSubmitting ? <CircularProgress size={24} /> : 'Finalizar Simulado'}
+              </Button>
+            )
         ) : (
-          <Button variant="contained" color="success" onClick={handleFinishExam} disabled={isSubmitting}>
-            {isSubmitting ? <CircularProgress size={24} /> : 'Finalizar Simulado'}
+          <Button variant="contained" onClick={handleCorrect} disabled={selectedAnswer === undefined}>
+            Corrigir
           </Button>
         )}
       </Box>
