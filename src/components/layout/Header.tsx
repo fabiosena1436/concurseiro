@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, IconButton, Drawer, List, ListItem, ListItemText } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, IconButton, Drawer, List, ListItem, ListItemText, ListItemButton } from '@mui/material';
 import React,
 {
   useState
@@ -40,33 +40,33 @@ export const Header: React.FC = () => {
 
   const menuItems = (
     <>
-      <ListItem button component={Link} to="/" onClick={handleDrawerToggle}>
+      <ListItemButton component={Link} to="/" onClick={handleDrawerToggle}>
         <ListItemText primary="Início" />
-      </ListItem>
-      <ListItem button component={Link} to="/about" onClick={handleDrawerToggle}>
+      </ListItemButton>
+      <ListItemButton component={Link} to="/about" onClick={handleDrawerToggle}>
         <ListItemText primary="Sobre" />
-      </ListItem>
+      </ListItemButton>
       {user && (
-        <ListItem button component={Link} to="/dashboard" onClick={handleDrawerToggle}>
+        <ListItemButton component={Link} to="/dashboard" onClick={handleDrawerToggle}>
           <ListItemText primary="Dashboard" />
-        </ListItem>
+        </ListItemButton>
       )}
-      <ListItem button component={Link} to="/criar-simulado" onClick={handleDrawerToggle}>
+      <ListItemButton component={Link} to="/criar-simulado" onClick={handleDrawerToggle}>
         <ListItemText primary="Criar Simulado" />
-      </ListItem>
+      </ListItemButton>
       {user ? (
         <>
           <ListItem>
             <ListItemText primary={userData?.socialName || user.email} />
           </ListItem>
-          <ListItem button onClick={() => { handleLogout(); handleDrawerToggle(); }}>
+          <ListItemButton onClick={() => { handleLogout(); handleDrawerToggle(); }}>
             <ListItemText primary="Sair" />
-          </ListItem>
+          </ListItemButton>
         </>
       ) : (
-        <ListItem button component={Link} to="/login" onClick={handleDrawerToggle}>
+        <ListItemButton component={Link} to="/login" onClick={handleDrawerToggle}>
           <ListItemText primary="Login" />
-        </ListItem>
+        </ListItemButton>
       )}
     </>
   );

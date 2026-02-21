@@ -99,21 +99,21 @@ export const Results: React.FC = () => {
 
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <Grid container spacing={2} textAlign="center">
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="h6">Pontuação</Typography>
             <Typography variant="h4" color="primary">{result.score.toFixed(1)}%</Typography>
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="h6">Acertos</Typography>
             <Typography variant="h4" color="primary">
               {result.answers.filter(a => a.isCorrect).length} / {exam.questions.length}
             </Typography>
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="h6">Tempo Gasto</Typography>
             <Typography variant="h4" color="primary">{formatTime(result.timeTaken)}</Typography>
           </Grid>
-          <Grid item xs={6} sm={3}>
+          <Grid size={{ xs: 6, sm: 3 }}>
             <Typography variant="h6">Data</Typography>
             <Typography variant="h4" color="primary">{new Date(result.completedAt).toLocaleDateString()}</Typography>
           </Grid>

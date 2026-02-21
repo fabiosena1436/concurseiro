@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { type Question } from '../types/exam';
-import { type Subject } from '../types/exam';
 
 // Recupera a chave da API das variáveis de ambiente
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
@@ -18,7 +17,7 @@ const openai = new OpenAI({
 
 // Esta função agora gera questões reais usando a API da OpenAI.
 export const generateQuestionsFromBank = async (
-  subject: Subject,
+  subject: string,
   numQuestions: number,
   banca: string,
   editalContent?: string

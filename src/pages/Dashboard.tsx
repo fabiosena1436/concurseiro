@@ -9,7 +9,7 @@ import {
   Typography,
   Box,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   Paper,
   Button,
@@ -19,8 +19,7 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle,
-  Grid
+  DialogTitle
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -120,13 +119,18 @@ export const Dashboard: React.FC = () => {
           results.length > 0 ? (
             <List>
               {results.map((result, index) => (
-                <ListItem
+                <ListItemButton
                   key={result.id}
-                  button
                   onClick={() => navigate(`/resultados/${result.id}`)}
                   divider={index < results.length - 1}
-                  secondaryAction={
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                >
+                  <ListItemText
+                    primary={result.examTitle}
+                    secondary={`Realizado em: ${new Date(
+                      result.completedAt
+                    ).toLocaleDateString()}`}
+                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Typography
                         variant="h6"
                         component="div"
@@ -135,19 +139,11 @@ export const Dashboard: React.FC = () => {
                       >
                         {result.score.toFixed(1)}%
                       </Typography>
-                      <IconButton edge="end" aria-label="delete" onClick={() => handleClickDelete(result.id)}>
+                      <IconButton edge="end" aria-label="delete" onClick={(e) => { e.stopPropagation(); handleClickDelete(result.id);}}>
                         <DeleteIcon />
                       </IconButton>
                     </Box>
-                  }
-                >
-                  <ListItemText
-                    primary={result.examTitle}
-                    secondary={`Realizado em: ${new Date(
-                      result.completedAt
-                    ).toLocaleDateString()}`}
-                  />
-                </ListItem>
+                </ListItemButton>
               ))}
             </List>
           ) : (

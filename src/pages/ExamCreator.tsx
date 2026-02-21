@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { auth } from '../services/firebase';
 import { createExam } from '../services/firestoreService';
 import { generateQuestionsFromBank } from '../services/aiService';
-import { type Subject } from '../types/exam';
 import {
   Container,
   Typography,
@@ -26,7 +25,7 @@ const bancas = [
     "Outra"
 ];
 
-const subjects: (Subject | 'outra')[] = [
+const subjects: string[] = [
     "portugues",
     "matematica",
     "informatica",
@@ -37,7 +36,7 @@ const subjects: (Subject | 'outra')[] = [
 
 export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
-  const [subject, setSubject] = useState<Subject | 'outra'>('portugues');
+  const [subject, setSubject] = useState<string>('portugues');
   const [customSubject, setCustomSubject] = useState('');
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
@@ -110,7 +109,7 @@ export const ExamCreator: React.FC = () => {
             id="subject"
             value={subject}
             label="Matéria"
-            onChange={(e) => setSubject(e.target.value as Subject | 'outra')}
+            onChange={(e) => setSubject(e.target.value)}
             required
           >
             {subjects.map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}

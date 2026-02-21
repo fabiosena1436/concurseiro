@@ -18,8 +18,7 @@ import {
   Grid,
   Chip,
   CircularProgress,
-  Paper,
-  FormHelperText
+  Paper
 } from '@mui/material';
 
 export const Exam: React.FC = () => {
@@ -234,7 +233,7 @@ export const Exam: React.FC = () => {
         <Typography variant="h6" gutterBottom>Navegação</Typography>
         <Grid container spacing={1}>
           {exam.questions.map((q, index) => (
-            <Grid item key={q.id}>
+            <Grid key={q.id}>
               <Chip
                 label={index + 1}
                 clickable
