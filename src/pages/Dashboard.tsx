@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { getResultsForUser, getExam } from '../services/firestoreService';
+import { Link, useNavigate } from 'react-router-dom';
+import { getResultsForUser, getExam, deleteResult } from '../services/firestoreService';
 import { useAuth } from '../hooks/useAuth';
 import type { Result } from '../types/result';
 import { Loader } from '../components/common/Loader';
@@ -14,7 +14,16 @@ import {
   Paper,
   Button,
   Divider,
+  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Grid
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+
 
 interface ResultWithExamTitle extends Result {
   examTitle: string;
@@ -28,9 +37,12 @@ const getScoreColor = (score: number) => {
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [results, setResults] = useState<ResultWithExamTitle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [resultToDelete, setResultToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -65,6 +77,30 @@ export const Dashboard: React.FC = () => {
 
     fetchHistory();
   }, [user]);
+  
+  const handleClickDelete = (resultId: string) => {
+    setResultToDelete(resultId);
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setResultToDelete(null);
+  };
+
+  const handleDelete = async () => {
+    if (resultToDelete) {
+      try {
+        await deleteResult(resultToDelete);
+        setResults(results.filter(result => result.id !== resultToDelete));
+      } catch (err) {
+        console.error('Erro ao deletar resultado:', err);
+        setError('Não foi possível deletar o resultado.');
+      } finally {
+        handleCloseDialog();
+      }
+    }
+  };
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -72,7 +108,7 @@ export const Dashboard: React.FC = () => {
         Meu Desempenho
       </Typography>
 
-      <Paper elevation={3} sx={{ p: 3 }}>
+      <Paper elevation={3} sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
         <Typography variant="h5" component="h2" color="primary" gutterBottom>
           Histórico de Simulados
         </Typography>
@@ -86,15 +122,23 @@ export const Dashboard: React.FC = () => {
               {results.map((result, index) => (
                 <ListItem
                   key={result.id}
+                  button
+                  onClick={() => navigate(`/resultados/${result.id}`)}
                   divider={index < results.length - 1}
                   secondaryAction={
-                    <Button
-                      component={Link}
-                      to={`/resultados/${result.id}`}
-                      variant="outlined"
-                    >
-                      Ver
-                    </Button>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography
+                        variant="h6"
+                        component="div"
+                        color={getScoreColor(result.score)}
+                        sx={{ mr: 2 }}
+                      >
+                        {result.score.toFixed(1)}%
+                      </Typography>
+                      <IconButton edge="end" aria-label="delete" onClick={() => handleClickDelete(result.id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
                   }
                 >
                   <ListItemText
@@ -103,13 +147,6 @@ export const Dashboard: React.FC = () => {
                       result.completedAt
                     ).toLocaleDateString()}`}
                   />
-                  <Typography
-                    variant="h6"
-                    component="div"
-                    color={getScoreColor(result.score)}
-                  >
-                    {result.score.toFixed(1)}%
-                  </Typography>
                 </ListItem>
               ))}
             </List>
@@ -130,6 +167,27 @@ export const Dashboard: React.FC = () => {
           )
         )}
       </Paper>
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {"Confirmar exclusão"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            Você tem certeza que deseja apagar este resultado? Esta ação não pode ser desfeita.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleDelete} autoFocus color="error">
+            Apagar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

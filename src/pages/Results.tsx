@@ -22,7 +22,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 export const Results: React.FC = () => {
   const { id: resultId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   const [result, setResult] = useState<ResultType | null>(null);
   const [exam, setExam] = useState<ExamType | null>(null);
@@ -30,6 +30,9 @@ export const Results: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!resultId || !user) {
       navigate('/');
       return;
@@ -64,7 +67,7 @@ export const Results: React.FC = () => {
 
     fetchResults();
 
-  }, [resultId, user, navigate]);
+  }, [resultId, user, navigate, loading]);
 
   if (isLoading) {
     return <Loader>Carregando resultados...</Loader>;
