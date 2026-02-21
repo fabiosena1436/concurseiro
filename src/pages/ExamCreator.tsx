@@ -14,7 +14,9 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
-  Alert
+  Alert,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 
 const bancas = [
@@ -42,6 +44,7 @@ export const ExamCreator: React.FC = () => {
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
   const [editalContent, setEditalContent] = useState('');
+  const [useEditalContent, setUseEditalContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,9 +57,14 @@ export const ExamCreator: React.FC = () => {
       return;
     }
     
-    const finalSubject = subject === 'outra' ? customSubject : subject;
-    if (!finalSubject) {
+    const finalSubject = useEditalContent ? "Edital" : (subject === 'outra' ? customSubject : subject);
+    if (!finalSubject && !useEditalContent) {
       setError("Por favor, selecione ou digite uma matéria.");
+      return;
+    }
+
+    if (useEditalContent && !editalContent) {
+      setError("Por favor, cole o conteúdo do edital.");
       return;
     }
 
@@ -78,7 +86,7 @@ export const ExamCreator: React.FC = () => {
       }
 
       const examData = {
-        title: `Simulado de ${finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`,
+        title: `Simulado de ${useEditalContent ? "Edital" : finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`,
         creatorId: auth.currentUser.uid,
         questions: questionsToUse,
         banca: finalBanca,
@@ -102,31 +110,52 @@ export const ExamCreator: React.FC = () => {
         Criar Simulado
       </Typography>
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-        <FormControl fullWidth margin="normal">
-          <InputLabel id="subject-label">Matéria</InputLabel>
-          <Select
-            labelId="subject-label"
-            id="subject"
-            value={subject}
-            label="Matéria"
-            onChange={(e) => setSubject(e.target.value)}
-            required
-          >
-            {subjects.map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}
-          </Select>
-        </FormControl>
+        <FormControlLabel
+          control={<Checkbox checked={useEditalContent} onChange={(e) => setUseEditalContent(e.target.checked)} />}
+          label="Usar Conteúdo do Edital"
+        />
 
-        {subject === 'outra' && (
+        {useEditalContent ? (
           <TextField
             fullWidth
             margin="normal"
-            id="customSubject"
-            label="Qual matéria?"
-            value={customSubject}
-            onChange={(e) => setCustomSubject(e.target.value)}
-            placeholder="Digite o nome da matéria"
-            required
+            id="editalContent"
+            label="Conteúdo do Edital"
+            multiline
+            rows={6}
+            value={editalContent}
+            onChange={(e) => setEditalContent(e.target.value)}
+            placeholder="Cole aqui o conteúdo do edital para gerar questões específicas."
           />
+        ) : (
+          <>
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="subject-label">Matéria</InputLabel>
+              <Select
+                labelId="subject-label"
+                id="subject"
+                value={subject}
+                label="Matéria"
+                onChange={(e) => setSubject(e.target.value)}
+                required
+              >
+                {subjects.map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            {subject === 'outra' && (
+              <TextField
+                fullWidth
+                margin="normal"
+                id="customSubject"
+                label="Qual matéria?"
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                placeholder="Digite o nome da matéria"
+                required
+              />
+            )}
+          </>
         )}
 
         <FormControl fullWidth margin="normal">
@@ -167,17 +196,7 @@ export const ExamCreator: React.FC = () => {
           InputProps={{ inputProps: { min: 1, max: 50 } }}
         />
         
-        <TextField
-            fullWidth
-            margin="normal"
-            id="editalContent"
-            label="Conteúdo do Edital (Opcional)"
-            multiline
-            rows={6}
-            value={editalContent}
-            onChange={(e) => setEditalContent(e.target.value)}
-            placeholder="Cole aqui o conteúdo do edital para gerar questões específicas."
-        />
+
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
