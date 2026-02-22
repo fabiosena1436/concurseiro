@@ -22,72 +22,76 @@ export const generateQuestionsFromBank = async (
   banca: string,
   editalContent?: string
 ): Promise<Question[]> => {
-
-  // 1. Construir o prompt detalhado para a IA
-  const prompt = `
-    Por favor, gere ${numQuestions} questões de concurso sobre o tópico "${subject}".
-    As questões devem seguir o estilo e o nível de dificuldade da banca examinadora: "${banca}".
-    ${editalContent ? `\nBaseie-se no seguinte conteúdo do edital:\n${editalContent}` : ''}
-    
-    Para cada questão, forneça:
-    - O texto da pergunta (question).
-    - 4 opções de resposta (options), sendo uma delas a correta.
-    - O índice da resposta correta (correctAnswer, um número de 0 a 3).
-    - Uma breve explicação sobre a resposta correta (explanation).
-
-    Formate a saída como um ÚNICO objeto JSON, contendo uma chave "questions".
-    O valor de "questions" deve ser um array de objetos, como no exemplo abaixo:
-    {
-      "questions": [
-        {
-          "id": "gerado-0",
-          "question": "Qual conceito de informática se refere à 'nuvem'?",
-          "options": ["Hardware Físico", "Computação em Nuvem", "Rede Local", "Software Instalado"],
-          "correctAnswer": 1,
-          "explanation": "Computação em nuvem é o fornecimento de serviços de computação pela Internet.",
-          "subject": "${subject}"
-        }
-      ]
-    }
-  `;
+  const allQuestions: Question[] = [];
+  const questionsPerCall = 10; // Número de questões a serem solicitadas por chamada de API
+  const numCalls = Math.ceil(numQuestions / questionsPerCall);
 
   try {
-    // 2. Fazer a chamada para a API da OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-1106", // Modelo otimizado para saídas JSON
-      messages: [
+    for (let i = 0; i < numCalls; i++) {
+      const currentNumQuestions = Math.min(questionsPerCall, numQuestions - allQuestions.length);
+      if (currentNumQuestions <= 0) continue;
+
+      const prompt = `
+        Por favor, gere ${currentNumQuestions} questões de concurso sobre o tópico "${subject}".
+        As questões devem seguir o estilo e o nível de dificuldade da banca examinadora: "${banca}".
+        ${editalContent ? `\nBaseie-se no seguinte conteúdo do edital:\n${editalContent}` : ''}
+        
+        Para cada questão, forneça:
+        - O texto da pergunta (question).
+        - 4 opções de resposta (options), sendo uma delas a correta.
+        - O índice da resposta correta (correctAnswer, um número de 0 a 3).
+        - Uma breve explicação sobre a resposta correta (explanation).
+
+        Formate a saída como um ÚNICO objeto JSON, contendo uma chave "questions".
+        O valor de "questions" deve ser um array de objetos, como no exemplo abaixo:
         {
-          role: "system",
-          content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua tarefa é gerar questões no formato JSON exato solicitado pelo usuário."
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" }, // Habilita o modo de saída JSON
-    });
+          "questions": [
+            {
+              "id": "gerado-0",
+              "question": "Qual conceito de informática se refere à 'nuvem'?",
+              "options": ["Hardware Físico", "Computação em Nuvem", "Rede Local", "Software Instalado"],
+              "correctAnswer": 1,
+              "explanation": "Computação em nuvem é o fornecimento de serviços de computação pela Internet.",
+              "subject": "${subject}"
+            }
+          ]
+        }
+      `;
 
-    // 3. Extrair e processar a resposta da IA
-    const responseContent = completion.choices[0]?.message?.content;
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-1106",
+        messages: [
+          {
+            role: "system",
+            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua tarefa é gerar questões no formato JSON exato solicitado pelo usuário."
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
 
-    if (!responseContent) {
-      throw new Error("A resposta da IA está vazia.");
+      const responseContent = completion.choices[0]?.message?.content;
+
+      if (!responseContent) {
+        throw new Error("A resposta da IA está vazia.");
+      }
+
+      console.log(`Resposta da API (chamada ${i + 1}/${numCalls}):`, responseContent);
+
+      const responseObject = JSON.parse(responseContent);
+      const questionsArray = responseObject.questions as Question[];
+
+      if (!Array.isArray(questionsArray)) {
+        throw new Error("A resposta da IA não contém um array de 'questions'.");
+      }
+
+      allQuestions.push(...questionsArray);
     }
-    
-    console.log("Resposta da API:", responseContent); // Para depuração
 
-    // O modelo pode retornar um objeto JSON com uma chave que contém o array.
-    // Precisamos encontrar e retornar o array de questões.
-    const responseObject = JSON.parse(responseContent);
-    const questionsArray = responseObject.questions as Question[];
-
-    if (!Array.isArray(questionsArray)) {
-       throw new Error("A resposta da IA não contém um array de 'questions'.");
-    }
-    
-    // Adiciona IDs únicos e garante que a matéria está correta
-    return questionsArray.map((q, index) => ({
+    return allQuestions.map((q, index) => ({
       ...q,
       id: `${subject}-${banca.toLowerCase().replace(/\s/g, '')}-${index}`,
       subject: subject,
@@ -95,7 +99,6 @@ export const generateQuestionsFromBank = async (
 
   } catch (error) {
     console.error("Erro ao chamar a API da OpenAI:", error);
-    // Em caso de erro na API, retorna uma questão de fallback para o usuário saber o que aconteceu.
     const fallbackQuestion: Question = {
       id: 'error-0',
       question: `Ocorreu um erro ao gerar as questões com a IA para a banca ${banca}.`,
@@ -104,7 +107,15 @@ export const generateQuestionsFromBank = async (
       explanation: error instanceof Error ? error.message : 'Erro desconhecido. Verifique o console de desenvolvedor.',
       subject: subject,
     };
-    return Array(numQuestions).fill(fallbackQuestion).map((q, i) => ({...q, id: `error-${i}`}));
+
+    // Se algumas questões foram geradas com sucesso, retorna-as junto com as de fallback
+    const remainingQuestions = numQuestions - allQuestions.length;
+    if (remainingQuestions > 0) {
+      const fallbackQuestions = Array(remainingQuestions).fill(fallbackQuestion).map((q, i) => ({ ...q, id: `error-${allQuestions.length + i}` }));
+      return [...allQuestions, ...fallbackQuestions];
+    }
+
+    return allQuestions;
   }
 };
 
