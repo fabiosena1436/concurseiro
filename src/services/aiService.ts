@@ -20,6 +20,7 @@ export const generateQuestionsFromBank = async (
   subject: string,
   numQuestions: number,
   banca: string,
+  difficulty: 'medio' | 'superior',
   editalContent?: string
 ): Promise<Question[]> => {
   const allQuestions: Question[] = [];
@@ -32,26 +33,35 @@ export const generateQuestionsFromBank = async (
       if (currentNumQuestions <= 0) continue;
 
       const prompt = `
-        Por favor, gere ${currentNumQuestions} questões de concurso sobre o tópico "${subject}".
-        As questões devem seguir o estilo e o nível de dificuldade da banca examinadora: "${banca}".
-        ${editalContent ? `\nBaseie-se no seguinte conteúdo do edital:\n${editalContent}` : ''}
-        
-        Para cada questão, forneça:
-        - O texto da pergunta (question).
-        - 4 opções de resposta (options), sendo uma delas a correta.
-        - O índice da resposta correta (correctAnswer, um número de 0 a 3).
-        - Uma breve explicação sobre a resposta correta (explanation).
+        **Instruções para o Assistente:**
+        Você é um especialista em criar questões para concursos públicos brasileiros, atuando como se fosse um membro da banca examinadora "${banca}".
+        Sua tarefa é gerar ${currentNumQuestions} questões de múltipla escolha com 4 opções cada.
 
-        Formate a saída como um ÚNICO objeto JSON, contendo uma chave "questions".
-        O valor de "questions" deve ser um array de objetos, como no exemplo abaixo:
+        **Regras Estritas:**
+        1.  **Fidelidade ao Conteúdo:** Se um "Conteúdo do Edital" for fornecido, TODAS as questões devem ser estritamente baseadas NELE. Não invente tópicos ou faça perguntas sobre o próprio edital. As questões devem ser sobre as MATÉRIAS dentro do edital.
+        2.  **Qualidade e Precisão:** As perguntas e respostas devem ser precisas, claras e com um nível de dificuldade apropriado para o nível "${difficulty === 'medio' ? 'Ensino Médio' : 'Ensino Superior'}".
+        3.  **Estilo da Banca:** As questões devem refletir o estilo e a complexidade da banca "${banca}".
+        4.  **Tópico Principal:** Se o campo "Conteúdo do Edital" estiver vazio, baseie as questões no tópico principal: "${subject}".
+
+        **Conteúdo do Edital (se aplicável):**
+        ${editalContent ? editalContent : "Nenhum conteúdo de edital fornecido. Usar o tópico principal."}
+
+        **Formato de Saída OBRIGATÓRIO:**
+        A saída deve ser um ÚNICO objeto JSON, contendo a chave "questions", que é um array de objetos. Cada objeto deve ter:
+        - "question": O texto da pergunta.
+        - "options": Um array com 4 strings para as opções.
+        - "correctAnswer": O índice (0 a 3) da resposta correta.
+        - "explanation": Uma explicação breve e clara do porquê a resposta está correta.
+
+        **Exemplo de Saída:**
         {
           "questions": [
             {
               "id": "gerado-0",
-              "question": "Qual conceito de informática se refere à 'nuvem'?",
-              "options": ["Hardware Físico", "Computação em Nuvem", "Rede Local", "Software Instalado"],
+              "question": "Exemplo de pergunta sobre o tópico.",
+              "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
               "correctAnswer": 1,
-              "explanation": "Computação em nuvem é o fornecimento de serviços de computação pela Internet.",
+              "explanation": "A opção B está correta porque...",
               "subject": "${subject}"
             }
           ]
@@ -63,7 +73,7 @@ export const generateQuestionsFromBank = async (
         messages: [
           {
             role: "system",
-            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua tarefa é gerar questões no formato JSON exato solicitado pelo usuário."
+            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua tarefa é gerar questões no formato JSON exato solicitado pelo usuário, seguindo regras estritas de fidelidade ao conteúdo e qualidade."
           },
           {
             role: "user",

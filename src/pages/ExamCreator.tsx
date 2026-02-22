@@ -43,6 +43,7 @@ export const ExamCreator: React.FC = () => {
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
+  const [difficulty, setDifficulty] = useState<'medio' | 'superior'>('medio');
   const [editalContent, setEditalContent] = useState('');
   const [useEditalContent, setUseEditalContent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,14 +78,14 @@ export const ExamCreator: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const questionsToUse = await generateQuestionsFromBank(finalSubject, numQuestions, finalBanca, editalContent);
+      const questionsToUse = await generateQuestionsFromBank(finalSubject, numQuestions, finalBanca, difficulty, editalContent);
 
       if (questionsToUse.length === 0) {
         setError("Não há questões disponíveis para os critérios selecionados.");
         setIsLoading(false);
         return;
       }
-
+      
       const examData = {
         title: `Simulado de ${useEditalContent ? "Edital" : finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`,
         creatorId: auth.currentUser.uid,
@@ -184,6 +185,21 @@ export const ExamCreator: React.FC = () => {
             required
           />
         )}
+
+        <FormControl fullWidth margin="normal">
+          <InputLabel id="difficulty-label">Dificuldade</InputLabel>
+          <Select
+            labelId="difficulty-label"
+            id="difficulty"
+            value={difficulty}
+            label="Dificuldade"
+            onChange={(e) => setDifficulty(e.target.value as 'medio' | 'superior')}
+            required
+          >
+            <MenuItem value="medio">Nível Médio</MenuItem>
+            <MenuItem value="superior">Nível Superior</MenuItem>
+          </Select>
+        </FormControl>
 
         <TextField
           fullWidth
