@@ -44,8 +44,9 @@ export const ExamCreator: React.FC = () => {
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
   const [difficulty, setDifficulty] = useState<'medio' | 'superior'>('medio');
-  const [editalContent, setEditalContent] = useState('');
   const [useEditalContent, setUseEditalContent] = useState(false);
+  const [editalContent, setEditalContent] = useState('');
+  const [editalTitle, setEditalTitle] = useState(''); // 1. ESTADO PARA TÍTULO DO EDITAL
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,32 +58,40 @@ export const ExamCreator: React.FC = () => {
       setError("Você precisa estar logado para criar um simulado.");
       return;
     }
+
+    // 4. VALIDAÇÃO ATUALIZADA
+    if (useEditalContent) {
+      if (!editalTitle.trim()) {
+        setError("Por favor, dê um nome ao seu simulado a partir do edital.");
+        return;
+      }
+      if (!editalContent.trim()) {
+        setError("Por favor, cole o conteúdo do edital para gerar questões.");
+        return;
+      }
+    }
     
-    // 3. REFINAR LÓGICA DE VALIDAÇÃO
-    const finalSubject = useEditalContent ? "Conteúdo do Edital" : (subject === 'Outra' ? customSubject.trim() : subject);
+    const finalSubject = useEditalContent ? editalTitle.trim() : (subject === 'Outra' ? customSubject.trim() : subject);
     if (!finalSubject) {
-      setError("Por favor, forneça uma matéria válida.");
+      setError("Por favor, forneça uma matéria ou um título para o edital.");
       return;
     }
 
-    if (useEditalContent && !editalContent.trim()) {
-      setError("Por favor, cole o conteúdo do edital para gerar questões.");
-      return;
-    }
-    
     const bancaDisplay = banca === 'Outra' ? customBanca.trim() : banca;
     if (!bancaDisplay) {
         setError("Por favor, forneça o nome da banca.");
         return;
     }
-    // A 'bancaApi' é o valor enviado para a função da nuvem (sempre um perfil válido).
     const bancaApi = banca === 'Outra' ? 'Outra' : banca;
 
     setIsLoading(true);
 
     try {
+      // O 'subject' enviado para a IA quando se usa edital é um resumo ou o título.
+      const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
+
       const questionsToUse = await generateQuestionsFromBank(
-        finalSubject, 
+        subjectForApi, 
         numQuestions, 
         bancaApi,
         difficulty, 
@@ -95,8 +104,8 @@ export const ExamCreator: React.FC = () => {
         return;
       }
       
-      // 2. PROTEGER GERAÇÃO DO TÍTULO
-      const examTitle = `Simulado de ${finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`;
+      // 3. LÓGICA DE GERAÇÃO DE TÍTULO ATUALIZADA
+      const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
 
       const examData = {
         title: examTitle,
@@ -122,7 +131,6 @@ export const ExamCreator: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Criar Simulado
       </Typography>
-      {/* 1. NORMALIZAR MANIPULADOR DE FORMULÁRIO */}
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
         <FormControlLabel
           control={<Checkbox checked={useEditalContent} onChange={(e) => setUseEditalContent(e.target.checked)} />}
@@ -130,18 +138,31 @@ export const ExamCreator: React.FC = () => {
         />
 
         {useEditalContent ? (
-          <TextField
-            fullWidth
-            margin="normal"
-            id="editalContent"
-            label="Conteúdo do Edital"
-            multiline
-            rows={6}
-            value={editalContent}
-            onChange={(e) => setEditalContent(e.target.value)}
-            placeholder="Cole aqui a parte do edital com o conteúdo programático."
-            required={useEditalContent}
-          />
+          <>
+            {/* 2. NOVO CAMPO DE TEXTO CONDICIONAL */}
+            <TextField
+              fullWidth
+              margin="normal"
+              id="editalTitle"
+              label="Nome para o Simulado (Edital)"
+              value={editalTitle}
+              onChange={(e) => setEditalTitle(e.target.value)}
+              placeholder="Ex: Simulado PM-SP 2024"
+              required={useEditalContent}
+            />
+            <TextField
+              fullWidth
+              margin="normal"
+              id="editalContent"
+              label="Conteúdo do Edital"
+              multiline
+              rows={6}
+              value={editalContent}
+              onChange={(e) => setEditalContent(e.target.value)}
+              placeholder="Cole aqui a parte do edital com o conteúdo programático."
+              required={useEditalContent}
+            />
+          </>
         ) : (
           <>
             <FormControl fullWidth margin="normal">
@@ -220,7 +241,7 @@ export const ExamCreator: React.FC = () => {
           type="number"
           value={numQuestions}
           onChange={(e) => setNumQuestions(Math.max(1, parseInt(e.target.value, 10)))}
-          InputProps={{ inputProps: { min: 1, max: 20 } }} // Limite razoável para uma chamada de API
+          InputProps={{ inputProps: { min: 1, max: 20 } }}
         />
         
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

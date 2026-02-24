@@ -19,7 +19,8 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle
+  DialogTitle,
+  Tooltip
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -32,6 +33,14 @@ const getScoreColor = (score: number) => {
   if (score >= 70) return 'success.main';
   if (score >= 50) return 'warning.main';
   return 'error.main';
+};
+
+// 1. FUNÇÃO PARA TRUNCAR TEXTO
+const truncateText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.substring(0, maxLength)}...`;
 };
 
 export const Dashboard: React.FC = () => {
@@ -124,12 +133,15 @@ export const Dashboard: React.FC = () => {
                   onClick={() => navigate(`/resultados/${result.id}`)}
                   divider={index < results.length - 1}
                 >
-                  <ListItemText
-                    primary={result.examTitle}
-                    secondary={`Realizado em: ${new Date(
-                      result.completedAt
-                    ).toLocaleDateString()}`}
-                  />
+                  {/* 2. APLICAR FUNÇÃO NO TÍTULO E ADICIONAR TOOLTIP */}
+                  <Tooltip title={result.examTitle} placement="top-start">
+                    <ListItemText
+                      primary={truncateText(result.examTitle, 70)}
+                      secondary={`Realizado em: ${new Date(
+                        result.completedAt
+                      ).toLocaleDateString()}`}
+                    />
+                  </Tooltip>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Typography
                         variant="h6"
