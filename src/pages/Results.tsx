@@ -65,7 +65,7 @@ export const Results: React.FC = () => {
       }
     };
 
-    fetchResults();
+    void fetchResults();
 
   }, [resultId, user, navigate, loading]);
 

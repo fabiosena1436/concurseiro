@@ -62,7 +62,7 @@ export const Exam: React.FC = () => {
       }
     };
 
-    fetchExam();
+    void fetchExam();
   }, [examId, navigate]);
 
   useEffect(() => {
@@ -218,7 +218,7 @@ export const Exam: React.FC = () => {
                 Próxima
               </Button>
             ) : (
-              <Button variant="contained" color="success" onClick={handleFinishExam} disabled={isSubmitting}>
+              <Button variant="contained" color="success" onClick={() => void handleFinishExam()} disabled={isSubmitting}>
                 {isSubmitting ? <CircularProgress size={24} /> : 'Finalizar Simulado'}
               </Button>
             )

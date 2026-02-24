@@ -57,7 +57,8 @@ export const generateQuestionsFromBank = async (
       explanation: error instanceof Error ? error.message : 'Erro desconhecido. Verifique o console de desenvolvedor para mais detalhes.',
       subject: subject,
     };
-    return Array(numQuestions).fill(fallbackQuestion).map((q, i) => ({ ...q, id: `error-${i}` }));
+    const fallbackQuestions: Question[] = Array.from({ length: numQuestions }, (_, i) => ({ ...fallbackQuestion, id: `error-${i}` }));
+    return fallbackQuestions;
   }
 };
 

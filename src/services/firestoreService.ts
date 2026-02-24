@@ -9,6 +9,7 @@ import {
   orderBy,
   serverTimestamp,
   deleteDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Exam } from "../types/exam";
@@ -46,7 +47,7 @@ export const getExam = async (examId: string): Promise<Exam | null> => {
     return {
       id: docSnap.id,
       ...data,
-      createdAt: data.createdAt.toDate(), // Converte o Timestamp para Date
+      createdAt: (data.createdAt as Timestamp).toDate(), // Converte o Timestamp para Date
     } as Exam;
   } else {
     return null;
@@ -82,7 +83,7 @@ export const getResult = async (resultId: string): Promise<Result | null> => {
     return {
       id: docSnap.id,
       ...data,
-      completedAt: data.completedAt.toDate(),
+      completedAt: (data.completedAt as Timestamp).toDate(),
     } as Result;
   } else {
     return null;
@@ -106,7 +107,7 @@ export const getResultsForUser = async (userId: string): Promise<Result[]> => {
     return {
       id: doc.id,
       ...data,
-      completedAt: data.completedAt.toDate(),
+      completedAt: (data.completedAt as Timestamp).toDate(),
     } as Result;
   });
 };

@@ -46,11 +46,16 @@ export const Signup: React.FC = () => {
                 });
             }
             navigate('/dashboard');
-        } catch (err: any) {
-            if (err.code === 'auth/email-already-in-use') {
-                setError("Este e-mail já está em uso.");
-            } else if (err.code === 'auth/weak-password') {
-                setError("A senha deve ter pelo menos 6 caracteres.");
+        } catch (err: unknown) {
+            if (typeof err === 'object' && err !== null && 'code' in err) {
+                const firebaseError = err as { code: string };
+                if (firebaseError.code === 'auth/email-already-in-use') {
+                    setError("Este e-mail já está em uso.");
+                } else if (firebaseError.code === 'auth/weak-password') {
+                    setError("A senha deve ter pelo menos 6 caracteres.");
+                } else {
+                    setError("Ocorreu um erro ao criar a conta.");
+                }
             } else {
                 setError("Ocorreu um erro ao criar a conta.");
             }
@@ -77,7 +82,7 @@ export const Signup: React.FC = () => {
                 <Typography component="h1" variant="h5">
                     Criar Conta
                 </Typography>
-                <Box component="form" onSubmit={handleSignup} sx={{ mt: 1 }}>
+                <Box component="form" onSubmit={(e) => void handleSignup(e)} sx={{ mt: 1 }}>
                     <TextField
                         margin="normal"
                         required

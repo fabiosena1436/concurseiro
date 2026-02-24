@@ -59,7 +59,7 @@ export const Header: React.FC = () => {
           <ListItem>
             <ListItemText primary={userData?.socialName || user.email} />
           </ListItem>
-          <ListItemButton onClick={() => { handleLogout(); handleDrawerToggle(); }}>
+          <ListItemButton onClick={() => { void handleLogout(); handleDrawerToggle(); }}>
             <ListItemText primary="Sair" />
           </ListItemButton>
         </>
@@ -125,7 +125,7 @@ export const Header: React.FC = () => {
             {user ? (
               <>
                 <Button color="inherit">{userData?.socialName || user.email}</Button>
-                <Button color="inherit" onClick={handleLogout}>
+                <Button color="inherit" onClick={() => void handleLogout()}>
                   Sair
                 </Button>
               </>

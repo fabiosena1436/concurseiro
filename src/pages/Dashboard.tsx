@@ -74,7 +74,7 @@ export const Dashboard: React.FC = () => {
       }
     };
 
-    fetchHistory();
+    void fetchHistory();
   }, [user]);
   
   const handleClickDelete = (resultId: string) => {
@@ -179,7 +179,7 @@ export const Dashboard: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleDelete} autoFocus color="error">
+          <Button onClick={() => void handleDelete()} color="error">
             Apagar
           </Button>
         </DialogActions>

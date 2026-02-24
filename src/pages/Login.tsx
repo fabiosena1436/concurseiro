@@ -27,8 +27,10 @@ export const Login: React.FC = () => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
             navigate('/dashboard');
-        } catch (err: any) {
-            setError("Credenciais inválidas. Verifique seu e-mail e senha.");
+        } catch (err) {
+            if (err instanceof Error) {
+              setError("Credenciais inválidas. Verifique seu e-mail e senha.");
+            }
             console.error(err);
         } finally {
             setIsSubmitting(false);
@@ -52,7 +54,7 @@ export const Login: React.FC = () => {
                 <Typography component="h1" variant="h5">
                     Entrar
                 </Typography>
-                <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
+                <Box component="form" onSubmit={(e) => void handleLogin(e)} sx={{ mt: 1 }}>
                     <TextField
                         margin="normal"
                         required
@@ -61,7 +63,6 @@ export const Login: React.FC = () => {
                         label="Seu e-mail"
                         name="email"
                         autoComplete="email"
-                        autoFocus
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                     />

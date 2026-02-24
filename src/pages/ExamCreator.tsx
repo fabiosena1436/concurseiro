@@ -97,9 +97,13 @@ export const ExamCreator: React.FC = () => {
 
       navigate(`/simulado/${examId}`);
 
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao criar o simulado: ", err);
-      setError(err.message || "Ocorreu um erro ao criar o simulado. Tente novamente.");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Ocorreu um erro ao criar o simulado. Tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +114,7 @@ export const ExamCreator: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Criar Simulado
       </Typography>
-      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+      <Box component="form" onSubmit={(e) => void handleSubmit(e)} sx={{ mt: 3 }}>
         <FormControlLabel
           control={<Checkbox checked={useEditalContent} onChange={(e) => setUseEditalContent(e.target.checked)} />}
           label="Usar Conteúdo do Edital"
