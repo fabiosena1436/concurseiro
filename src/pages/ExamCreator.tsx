@@ -28,17 +28,17 @@ const bancas = [
 ];
 
 const subjects: string[] = [
-    "portugues",
-    "matematica",
-    "informatica",
-    "direito",
-    "outra"
+    "Português",
+    "Matemática",
+    "Informática",
+    "Direito",
+    "Outra"
 ];
 
 
 export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
-  const [subject, setSubject] = useState<string>('portugues');
+  const [subject, setSubject] = useState<string>(subjects[0]);
   const [customSubject, setCustomSubject] = useState('');
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
@@ -58,52 +58,60 @@ export const ExamCreator: React.FC = () => {
       return;
     }
     
-    const finalSubject = useEditalContent ? "Edital" : (subject === 'outra' ? customSubject : subject);
-    if (!finalSubject && !useEditalContent) {
-      setError("Por favor, selecione ou digite uma matéria.");
+    // 3. REFINAR LÓGICA DE VALIDAÇÃO
+    const finalSubject = useEditalContent ? "Conteúdo do Edital" : (subject === 'Outra' ? customSubject.trim() : subject);
+    if (!finalSubject) {
+      setError("Por favor, forneça uma matéria válida.");
       return;
     }
 
-    if (useEditalContent && !editalContent) {
-      setError("Por favor, cole o conteúdo do edital.");
+    if (useEditalContent && !editalContent.trim()) {
+      setError("Por favor, cole o conteúdo do edital para gerar questões.");
       return;
     }
-
-    const finalBanca = banca === 'Outra' ? customBanca : banca;
-    if (banca === 'Outra' && !customBanca) {
-      setError("Por favor, digite o nome da banca.");
-      return;
+    
+    const bancaDisplay = banca === 'Outra' ? customBanca.trim() : banca;
+    if (!bancaDisplay) {
+        setError("Por favor, forneça o nome da banca.");
+        return;
     }
+    // A 'bancaApi' é o valor enviado para a função da nuvem (sempre um perfil válido).
+    const bancaApi = banca === 'Outra' ? 'Outra' : banca;
 
     setIsLoading(true);
 
     try {
-      const questionsToUse = await generateQuestionsFromBank(finalSubject, numQuestions, finalBanca, difficulty, editalContent);
+      const questionsToUse = await generateQuestionsFromBank(
+        finalSubject, 
+        numQuestions, 
+        bancaApi,
+        difficulty, 
+        useEditalContent ? editalContent : undefined
+      );
 
-      if (questionsToUse.length === 0) {
-        setError("Não há questões disponíveis para os critérios selecionados.");
+      if (questionsToUse.length === 0 || questionsToUse[0]?.id.startsWith('error-')) {
+        setError(questionsToUse[0]?.question || "Não foi possível gerar questões com os critérios fornecidos. Tente novamente.");
         setIsLoading(false);
         return;
       }
       
+      // 2. PROTEGER GERAÇÃO DO TÍTULO
+      const examTitle = `Simulado de ${finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`;
+
       const examData = {
-        title: `Simulado de ${useEditalContent ? "Edital" : finalSubject.charAt(0).toUpperCase() + finalSubject.slice(1)}`,
+        title: examTitle,
         creatorId: auth.currentUser.uid,
         questions: questionsToUse,
-        banca: finalBanca,
+        banca: bancaDisplay,
       };
 
       const examId = await createExam(examData);
-
       navigate(`/simulado/${examId}`);
 
     } catch (err) {
       console.error("Erro ao criar o simulado: ", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Ocorreu um erro ao criar o simulado. Tente novamente.");
-      }
+      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
+      setError(`Falha ao criar o simulado: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -114,10 +122,11 @@ export const ExamCreator: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Criar Simulado
       </Typography>
-      <Box component="form" onSubmit={(e) => void handleSubmit(e)} sx={{ mt: 3 }}>
+      {/* 1. NORMALIZAR MANIPULADOR DE FORMULÁRIO */}
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
         <FormControlLabel
           control={<Checkbox checked={useEditalContent} onChange={(e) => setUseEditalContent(e.target.checked)} />}
-          label="Usar Conteúdo do Edital"
+          label="Gerar questões a partir do conteúdo do edital"
         />
 
         {useEditalContent ? (
@@ -130,7 +139,8 @@ export const ExamCreator: React.FC = () => {
             rows={6}
             value={editalContent}
             onChange={(e) => setEditalContent(e.target.value)}
-            placeholder="Cole aqui o conteúdo do edital para gerar questões específicas."
+            placeholder="Cole aqui a parte do edital com o conteúdo programático."
+            required={useEditalContent}
           />
         ) : (
           <>
@@ -142,13 +152,12 @@ export const ExamCreator: React.FC = () => {
                 value={subject}
                 label="Matéria"
                 onChange={(e) => setSubject(e.target.value)}
-                required
               >
-                {subjects.map(s => <MenuItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>)}
+                {subjects.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
               </Select>
             </FormControl>
 
-            {subject === 'outra' && (
+            {subject === 'Outra' && (
               <TextField
                 fullWidth
                 margin="normal"
@@ -157,7 +166,7 @@ export const ExamCreator: React.FC = () => {
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value)}
                 placeholder="Digite o nome da matéria"
-                required
+                required={subject === 'Outra'}
               />
             )}
           </>
@@ -171,7 +180,6 @@ export const ExamCreator: React.FC = () => {
             value={banca}
             label="Banca Examinadora"
             onChange={(e) => setBanca(e.target.value)}
-            required
           >
             {bancas.map(b => <MenuItem key={b} value={b}>{b}</MenuItem>)}
           </Select>
@@ -185,20 +193,19 @@ export const ExamCreator: React.FC = () => {
             label="Qual banca?"
             value={customBanca}
             onChange={(e) => setCustomBanca(e.target.value)}
-            placeholder="Digite o nome da banca"
-            required
+            placeholder="Digite o nome da banca (ex: Vunesp)"
+            required={banca === 'Outra'}
           />
         )}
 
         <FormControl fullWidth margin="normal">
-          <InputLabel id="difficulty-label">Dificuldade</InputLabel>
+          <InputLabel id="difficulty-label">Nível de Dificuldade</InputLabel>
           <Select
             labelId="difficulty-label"
             id="difficulty"
             value={difficulty}
-            label="Dificuldade"
+            label="Nível de Dificuldade"
             onChange={(e) => setDifficulty(e.target.value as 'medio' | 'superior')}
-            required
           >
             <MenuItem value="medio">Nível Médio</MenuItem>
             <MenuItem value="superior">Nível Superior</MenuItem>
@@ -212,12 +219,10 @@ export const ExamCreator: React.FC = () => {
           label="Número de Questões"
           type="number"
           value={numQuestions}
-          onChange={(e) => setNumQuestions(parseInt(e.target.value, 10))}
-          InputProps={{ inputProps: { min: 1, max: 50 } }}
+          onChange={(e) => setNumQuestions(Math.max(1, parseInt(e.target.value, 10)))}
+          InputProps={{ inputProps: { min: 1, max: 20 } }} // Limite razoável para uma chamada de API
         />
         
-
-
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
         <Button
@@ -227,7 +232,7 @@ export const ExamCreator: React.FC = () => {
           sx={{ mt: 3, mb: 2 }}
           disabled={isLoading}
         >
-          {isLoading ? <CircularProgress size={24} /> : 'Iniciar Simulado'}
+          {isLoading ? <CircularProgress size={24} /> : 'Gerar Simulado com IA'}
         </Button>
       </Box>
     </Container>

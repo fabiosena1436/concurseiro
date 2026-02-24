@@ -5,120 +5,167 @@ import OpenAI from "openai";
 
 admin.initializeApp();
 
+// BOAS PRÁTICAS: Em um ambiente de produção, armazene a chave da API no Secret Manager.
+// Isso oferece mais segurança, controle de versão e gerenciamento de acesso.
+// A chave seria acessada via process.env.OPENAI_API_KEY.
+// Para este exemplo, continuamos usando o functions.config() para simplicidade.
 const openai = new OpenAI({
   apiKey: functions.config().openai.key,
 });
 
-const model = functions.config().openai.model || "gpt-3.5-turbo-1106";
+const model = functions.config().openai.model || "gpt-4-turbo";
+
+// 1. PERFIS DE BANCA: Define o estilo de cada banca para a IA.
+const bancaProfiles = {
+  "Cespe/Cebraspe": "Famosa por questões no formato 'Certo' ou 'Errado', onde uma resposta errada anula uma certa. As questões são complexas, interdisciplinares e exigem muita atenção a detalhes e jurisprudência atualizada.",
+  "Fundação Getúlio Vargas (FGV)": "Conhecida por questões longas, com textos e cenários complexos que exigem interpretação e raciocínio lógico. As alternativas são muitas vezes bem elaboradas para induzir ao erro.",
+  "Fundação Cesgranrio": "Estilo mais direto e objetivo, com questões que cobram o conhecimento literal da lei ou do conteúdo. Menos interpretativa que a FGV ou o Cespe.",
+  "Fundação Carlos Chagas (FCC)": "Alternativas geralmente longas e muito parecidas entre si, exigindo que o candidato conheça o 'decoreba' e a literalidade da lei. A jurisprudência também é cobrada com frequência.",
+  "Outra": "Estilo genérico de múltipla escolha (A, B, C, D), focado na precisão do conteúdo e clareza.",
+};
+
+/**
+ * 2. SIMULAÇÃO DE RAG: Isola o contexto mais relevante do edital.
+ * Em um sistema RAG completo, isso seria uma busca vetorial.
+ * Aqui, pegamos os primeiros 4000 caracteres para garantir que o contexto
+ * caiba no prompt e seja focado.
+ * @param {string} content O conteúdo completo do edital.
+ * @returns {string} Um trecho relevante do conteúdo.
+ */
+const getRelevantContext = (content: string): string => {
+  if (!content) {
+    return "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
+  }
+  // Simulação: Pega os primeiros 4000 caracteres como contexto principal.
+  // Isso evita exceder os limites de token e força a IA a focar.
+  return content.substring(0, 4000);
+};
+
+const createPrompt = (data: {
+  subject: string;
+  numQuestions: number;
+  banca: keyof typeof bancaProfiles;
+  difficulty: string;
+  editalContent?: string;
+}) => {
+  const { subject, numQuestions, banca, difficulty, editalContent } = data;
+  const bancaStyle = bancaProfiles[banca] || bancaProfiles["Outra"];
+  const context = getRelevantContext(editalContent || "");
+
+  // 3. PROMPT ESTRUTURADO (CHAIN-OF-THOUGHT):
+  return `
+    **Você é um Especialista em Concursos Públicos e membro da banca examinadora "${banca}".**
+
+    **Missão:** Gerar ${numQuestions} questões de concurso de altíssima qualidade.
+
+    **ETAPA 1: ANÁLISE DO CONTEXTO**
+    - **Nível de Dificuldade Alvo:** ${difficulty === "medio" ? "Ensino Médio" : "Ensino Superior"}.
+    - **Estilo da Banca (${banca}):** ${bancaStyle}.
+    - **Fonte de Verdade (Contexto):** Use **APENAS** as informações contidas na seção "CONTEXTO PARA QUESTÕES" abaixo. Se o contexto for insuficiente, recuse-se a criar a questão.
+    
+    **CONTEXTO PARA QUESTÕES:**
+    ---
+    ${context}
+    ---
+    
+    **Tópico Principal (se o contexto for vazio):** ${subject}.
+
+    **ETAPA 2: REGRAS RÍGIDAS DE GERAÇÃO**
+    1.  **FIDELIDADE ABSOLUTA:** Crie todas as ${numQuestions} questões e suas explicações baseando-se **ESTRITAMENTE** no "CONTEXTO PARA QUESTÕES".
+    2.  **NÃO INVENTE:** Não adicione informações externas, mesmo que corretas. Se a resposta não estiver no contexto, a questão não pode ser criada.
+    3.  **VERIFICAÇÃO TRIPLA:** Antes de finalizar, revise cada questão para garantir que ela (a) respeita o estilo da banca, (b) é apropriada para o nível de dificuldade e (c) pode ser respondida **exclusivamente** com o contexto fornecido.
+    4.  **FORMATO JSON OBRIGATÓRIO:** A saída final deve ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos.
+
+    **ETAPA 3: GERAÇÃO E FORMATAÇÃO**
+    Produza o JSON com a seguinte estrutura para cada questão:
+    - "question": (string) O enunciado da pergunta.
+    - "options": (string[]) Um array com 4 opções de resposta.
+    - "correctAnswer": (number) O índice (0-3) da resposta correta.
+    - "explanation": (string) Uma explicação detalhada justificando a resposta correta com base no "CONTEXTO PARA QUESTÕES".
+
+    **Exemplo de Saída JSON:**
+    {
+      "questions": [
+        {
+          "question": "De acordo com o texto, qual princípio é fundamental?",
+          "options": ["Opção A", "Opção B", "Opção C", "Opção D"],
+          "correctAnswer": 0,
+          "explanation": "A resposta é 'Opção A' porque o texto afirma explicitamente na linha 5 que..."
+        }
+      ]
+    }
+  `;
+};
 
 export const generateQuestions = functions.https.onCall(async (data, context) => {
-  // Check if the user is authenticated.
   if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "The function must be called while authenticated."
-    );
+    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
   }
 
   const { subject, numQuestions, banca, difficulty, editalContent } = data;
 
   if (!subject || !numQuestions || !banca || !difficulty) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with the arguments 'subject', 'numQuestions', 'banca', and 'difficulty'."
-    );
+    throw new functions.https.HttpsError("invalid-argument", "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.");
   }
 
-  const questionsPerCall = 10;
-  const numCalls = Math.ceil(numQuestions / questionsPerCall);
   const allQuestions: any[] = [];
-
+  // Para manter a simplicidade, faremos uma única chamada.
+  // A lógica de paginação pode ser reintroduzida se necessário.
+  
   try {
-    for (let i = 0; i < numCalls; i++) {
-      const currentNumQuestions = Math.min(questionsPerCall, numQuestions - allQuestions.length);
-      if (currentNumQuestions <= 0) continue;
+    const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent });
 
-      const prompt = `
-        **Instruções para o Assistente:**
-        Você é um especialista em criar questões para concursos públicos brasileiros, atuando como se fosse um membro da banca examinadora "${banca}".
-        Sua tarefa é gerar ${currentNumQuestions} questões de múltipla escolha com 4 opções cada.
-
-        **Regras Estritas:**
-        1.  **Fidelidade ao Conteúdo:** Se um "Conteúdo do Edital" for fornecido, TODAS as questões devem ser estritamente baseadas NELE. Não invente tópicos ou faça perguntas sobre o próprio edital. As questões devem ser sobre as MATÉRIAS dentro do edital.
-        2.  **Qualidade e Precisão:** As perguntas e respostas devem ser precisas, claras e com um nível de dificuldade apropriado para o nível "${difficulty === 'medio' ? 'Ensino Médio' : 'Ensino Superior'}".
-        3.  **Estilo da Banca:** As questões devem refletir o estilo e a complexidade da banca "${banca}".
-        4.  **Tópico Principal:** Se o campo "Conteúdo do Edital" estiver vazio, baseie as questões no tópico principal: "${subject}".
-
-        **Conteúdo do Edital (se aplicável):**
-        ${editalContent ? editalContent : "Nenhum conteúdo de edital fornecido. Usar o tópico principal."}
-
-        **Formato de Saída OBRIGATÓRIO:**
-        A saída deve ser um ÚNICO objeto JSON, contendo a chave "questions", que é um array de objetos. Cada objeto deve ter:
-        - "question": O texto da pergunta.
-        - "options": Um array com 4 strings para as opções.
-        - "correctAnswer": O índice (0 a 3) da resposta correta.
-        - "explanation": Uma explicação breve e clara do porquê a resposta está correta.
-
-        **Exemplo de Saída Detalhado:**
+    const completion = await openai.chat.completions.create({
+      model: model,
+      messages: [
         {
-          "questions": [
-            {
-              "id": "gerado-0",
-              "question": "De acordo com a Constituição Federal de 1988, qual dos seguintes princípios NÃO é um fundamento da República Federativa do Brasil?",
-              "options": [
-                "A soberania",
-                "A cidadania",
-                "A dignidade da pessoa humana",
-                "A separação de poderes"
-              ],
-              "correctAnswer": 3,
-              "explanation": "A separação de poderes, embora seja um princípio fundamental da organização do Estado brasileiro, não está listada no Art. 1º da Constituição como um dos fundamentos da República, que são: a soberania, a cidadania, a dignidade da pessoa humana, os valores sociais do trabalho e da livre iniciativa, e o pluralismo político.",
-              "subject": "Direito Constitucional"
-            }
-          ]
-        }
-      `;
+          role: "system",
+          content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
 
-      const completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua tarefa é gerar questões no formato JSON exato solicitado pelo usuário, seguindo regras estritas de fidelidade ao conteúdo e qualidade."
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        response_format: { type: "json_object" },
-      });
+    const responseContent = completion.choices[0]?.message?.content;
 
-      const responseContent = completion.choices[0]?.message?.content;
-
-      if (!responseContent) {
-        throw new functions.https.HttpsError("internal", "A resposta da IA está vazia.");
-      }
-
-      const responseObject = JSON.parse(responseContent);
-      const questionsArray = responseObject.questions;
-
-      if (!Array.isArray(questionsArray)) {
-        throw new functions.https.HttpsError("internal", "A resposta da IA não contém um array de 'questions'.");
-      }
-
-      allQuestions.push(...questionsArray);
+    if (!responseContent) {
+      throw new functions.https.HttpsError("internal", "A resposta da IA está vazia ou nula.");
     }
+
+    let responseObject;
+    try {
+      // 4. TRATAMENTO DE ERRO MELHORADO:
+      responseObject = JSON.parse(responseContent);
+    } catch (parseError) {
+      console.error("Error parsing JSON from OpenAI:", {
+        response: responseContent,
+        error: parseError,
+      });
+      throw new functions.https.HttpsError("internal", "A resposta da IA não é um JSON válido. Verifique os logs.", { originalResponse: responseContent });
+    }
+
+    const questionsArray = responseObject.questions;
+
+    if (!Array.isArray(questionsArray)) {
+      throw new functions.https.HttpsError("internal", "A resposta da IA não contém um array 'questions'.");
+    }
+
+    allQuestions.push(...questionsArray);
 
     return allQuestions.map((q, index) => ({
       ...q,
-      id: `${subject}-${banca.toLowerCase().replace(/\s/g, '')}-${index}`,
+      id: `${subject}-${banca.toLowerCase().replace(/\s/g, "")}-${index}`,
       subject: subject,
     }));
 
-  } catch (error) {
-    console.error("Error calling OpenAI API:", {
-      error: error,
+  } catch (error: any) {
+    console.error("Error calling OpenAI API or processing data:", {
+      errorMessage: error.message,
+      errorCode: error.code,
       requestData: data,
     });
 
@@ -126,6 +173,6 @@ export const generateQuestions = functions.https.onCall(async (data, context) =>
       throw error;
     }
 
-    throw new functions.https.HttpsError("internal", "Error calling OpenAI API.", error);
+    throw new functions.https.HttpsError("internal", "Ocorreu um erro interno ao chamar a API da IA.", { originalError: error.message });
   }
 });
