@@ -1,8 +1,7 @@
-import { httpsCallable, FunctionsError } from 'firebase/functions';
-import { functions } from './firebase';
+import { functions, auth } from './firebase';
 import { type Question } from '../types/exam';
 
-const generateQuestionsFn = httpsCallable(functions, 'generateQuestions');
+const functionURL = 'https://us-central1-simulado-concurso-ia.cloudfunctions.net/generateQuestions';
 
 export const generateQuestionsFromBank = async (
   subject: string,
@@ -12,14 +11,41 @@ export const generateQuestionsFromBank = async (
   editalContent?: string
 ): Promise<Question[]> => {
   try {
-    const result = await generateQuestionsFn({
-      subject,
-      numQuestions,
-      banca,
-      difficulty,
-      editalContent,
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('Você precisa estar autenticado para gerar questões.');
+    }
+
+    const token = await user.getIdToken();
+
+    const response = await fetch(functionURL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data: {
+          subject,
+          numQuestions,
+          banca,
+          difficulty,
+          editalContent,
+        }
+      }),
     });
 
+    const result = await response.json();
+
+    if (!response.ok) {
+      // A resposta de erro da nossa função agora está em result.error
+      const errorPayload = result.error || { message: 'Erro desconhecido', status: 'UNKNOWN' };
+      console.error("Erro ao chamar a função da nuvem 'generateQuestions':", errorPayload);
+      // Lançamos um erro com a mensagem da API para ser pego pelo bloco catch
+      throw new Error(errorPayload.message || 'Falha ao buscar dados.');
+    }
+
+    // O SDK do cliente espera que a resposta esteja dentro de um objeto 'data'
     const questions = result.data as Question[];
     
     return questions.map((q, index) => ({
@@ -28,25 +54,15 @@ export const generateQuestionsFromBank = async (
       subject: subject,
     }));
 
-  } catch (error) {
-    console.error("Erro ao chamar a função da nuvem 'generateQuestions':", error);
+  } catch (error: any) {
+    // O erro pode ser da rede (fetch falhou) ou o que lançamos acima
+    console.error("Falha na operação de generateQuestionsFromBank:", error);
 
     let errorMessage = `Ocorreu um erro ao gerar as questões com a IA para a banca ${banca}.`;
-    if (error instanceof FunctionsError) {
-      switch (error.code) {
-        case 'unauthenticated':
-          errorMessage = 'Você precisa estar autenticado para gerar questões.';
-          break;
-        case 'invalid-argument':
-          errorMessage = 'Houve um problema com os parâmetros enviados para gerar as questões.';
-          break;
-        case 'internal':
-          errorMessage = 'Ocorreu um erro interno no servidor ao gerar as questões. A equipe de desenvolvimento já foi notificada.';
-          break;
-        default:
-          errorMessage = `Ocorreu um erro inesperado. Código: ${error.code}`;
-          break;
-      }
+    // Simplificamos o tratamento de erro, pois os detalhes de 'unauthenticated', etc.
+    // já são tratados pela lógica de erro mais genérica.
+    if (error.message) {
+      errorMessage = error.message;
     }
 
     const fallbackQuestion: Question = {
@@ -54,11 +70,10 @@ export const generateQuestionsFromBank = async (
       question: errorMessage,
       options: ['Tente novamente', 'Verifique os parâmetros', 'Tente mais tarde', 'Contate o suporte'],
       correctAnswer: 0,
-      explanation: error instanceof Error ? error.message : 'Erro desconhecido. Verifique o console de desenvolvedor para mais detalhes.',
+      explanation: error.message || 'Erro desconhecido. Verifique o console de desenvolvedor para mais detalhes.',
       subject: subject,
     };
     const fallbackQuestions: Question[] = Array.from({ length: numQuestions }, (_, i) => ({ ...fallbackQuestion, id: `error-${i}` }));
     return fallbackQuestions;
   }
 };
-

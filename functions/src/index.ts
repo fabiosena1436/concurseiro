@@ -2,25 +2,17 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
+import * as cors from "cors";
+import {defineString} from "firebase-functions/params";
+
+// 1. DEFINIÇÃO DE PARÂMETROS (A NOVA FORMA)
+const openAIKey = defineString("OPENAI_KEY");
+const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4-turbo"});
+
+// 2. CONFIGURAÇÃO DO CORS
+const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
-
-// 1. VERIFICAÇÃO DA CHAVE DA API
-const apiKey = functions.config().openai?.key;
-
-if (!apiKey) {
-  // 2. ERRO INFORMATIVO
-  console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  console.error("!!! A CHAVE DA API DA OPENAI NÃO FOI CONFIGURADA.         !!!");
-  console.error("!!! Execute o comando:                                   !!!");
-  console.error("!!! firebase functions:config:set openai.key='SUA_CHAVE' !!!");
-  console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  throw new functions.https.HttpsError("failed-precondition", "A chave da API do OpenAI não está configurada no servidor. Contate o administrador.");
-}
-
-const openai = new OpenAI({ apiKey });
-
-const model = functions.config().openai.model || "gpt-4-turbo";
 
 const bancaProfiles = {
   "Cespe/Cebraspe": "Famosa por questões no formato 'Certo' ou 'Errado', onde uma resposta errada anula uma certa. As questões são complexas, interdisciplinares e exigem muita atenção a detalhes e jurisprudência atualizada.",
@@ -74,64 +66,94 @@ const createPrompt = (data: {
   `;
 };
 
-export const generateQuestions = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "A função deve ser chamada por um usuário autenticado.");
-  }
-  const { subject, numQuestions, banca, difficulty, editalContent } = data;
-  if (!subject || !numQuestions || !banca || !difficulty) {
-    throw new functions.https.HttpsError("invalid-argument", "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.");
-  }
-  const allQuestions: any[] = [];
-  try {
-    const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent });
-    const completion = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        {
-          role: "system",
-          content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-    const responseContent = completion.choices[0]?.message?.content;
-    if (!responseContent) {
-      throw new functions.https.HttpsError("internal", "A resposta da IA está vazia ou nula.");
+export const generateQuestions = functions.https.onRequest((request, response) => {
+  corsHandler(request, response, async () => {
+    const idToken = request.headers.authorization?.split("Bearer ")[1];
+    if (!idToken) {
+      response.status(401).send({ error: { message: "Unauthorized. No token provided.", status: "UNAUTHENTICATED" } });
+      return;
     }
-    let responseObject;
+
     try {
-      responseObject = JSON.parse(responseContent);
-    } catch (parseError) {
-      console.error("Error parsing JSON from OpenAI:", {
-        response: responseContent,
-        error: parseError,
+      await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      console.error("Error verifying ID token:", error);
+      response.status(401).send({ error: { message: "Unauthorized. Invalid token.", status: "UNAUTHENTICATED" } });
+      return;
+    }
+
+    // 3. USANDO OS PARÂMETROS EM TEMPO DE EXECUÇÃO
+    const apiKey = openAIKey.value();
+    const model = openAIModel.value();
+
+    if (!apiKey) {
+      console.error("A chave da API da OpenAI não foi configurada. Execute 'firebase functions:config:set OPENAI_KEY=sua_chave'");
+      response.status(500).send({ error: { message: "A chave da API do OpenAI não está configurada no servidor. Contate o administrador.", status: "FAILED_PRECONDITION" } });
+      return;
+    }
+    
+    const openai = new OpenAI({ apiKey });
+    const data = request.body.data;
+    const { subject, numQuestions, banca, difficulty, editalContent } = data;
+
+    if (!subject || !numQuestions || !banca || !difficulty) {
+      response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
+      return;
+    }
+
+    try {
+      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent });
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: { type: "json_object" },
       });
-      throw new functions.https.HttpsError("internal", "A resposta da IA não é um JSON válido. Verifique os logs.", { originalResponse: responseContent });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        response.status(500).send({ error: { message: "A resposta da IA está vazia ou nula.", status: "INTERNAL" } });
+        return;
+      }
+
+      let responseObject;
+      try {
+        responseObject = JSON.parse(responseContent);
+      } catch (parseError) {
+        console.error("Error parsing JSON from OpenAI:", { response: responseContent, error: parseError });
+        response.status(500).send({ error: { message: "A resposta da IA não é um JSON válido.", status: "INTERNAL", details: { originalResponse: responseContent } } });
+        return;
+      }
+
+      const questionsArray = responseObject.questions;
+      if (!Array.isArray(questionsArray)) {
+        response.status(500).send({ error: { message: "A resposta da IA não contém um array 'questions'.", status: "INTERNAL" } });
+        return;
+      }
+
+      const allQuestions = questionsArray.map((q, index) => ({
+        ...q,
+        id: `${subject}-${banca.toLowerCase().replace(/\s/g, "")}-${index}`,
+        subject: subject,
+      }));
+
+      response.status(200).send({ data: allQuestions });
+
+    } catch (error: any) {
+      console.error("Error calling OpenAI API or processing data:", {
+        errorMessage: error.message,
+        errorCode: error.code,
+        requestData: data,
+      });
+      response.status(500).send({ error: { message: "Ocorreu um erro interno ao chamar a API da IA.", status: "INTERNAL", details: { originalError: error.message } } });
     }
-    const questionsArray = responseObject.questions;
-    if (!Array.isArray(questionsArray)) {
-      throw new functions.https.HttpsError("internal", "A resposta da IA não contém um array 'questions'.");
-    }
-    allQuestions.push(...questionsArray);
-    return allQuestions.map((q, index) => ({
-      ...q,
-      id: `${subject}-${banca.toLowerCase().replace(/\s/g, "")}-${index}`,
-      subject: subject,
-    }));
-  } catch (error: any) {
-    console.error("Error calling OpenAI API or processing data:", {
-      errorMessage: error.message,
-      errorCode: error.code,
-      requestData: data,
-    });
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
-    }
-    throw new functions.https.HttpsError("internal", "Ocorreu um erro interno ao chamar a API da IA.", { originalError: error.message });
-  }
+  });
 });
