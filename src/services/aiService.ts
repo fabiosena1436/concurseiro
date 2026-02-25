@@ -58,22 +58,16 @@ export const generateQuestionsFromBank = async (
     // O erro pode ser da rede (fetch falhou) ou o que lançamos acima
     console.error("Falha na operação de generateQuestionsFromBank:", error);
 
-    let errorMessage = `Ocorreu um erro ao gerar as questões com a IA para a banca ${banca}.`;
-    // Simplificamos o tratamento de erro, pois os detalhes de 'unauthenticated', etc.
-    // já são tratados pela lógica de erro mais genérica.
-    if (error.message) {
-      errorMessage = error.message;
-    }
+    let errorMessage = `Ocorreu um erro ao gerar as questões com a IA. Detalhe: ${error.message}`;
 
     const fallbackQuestion: Question = {
       id: 'error-0',
       question: errorMessage,
       options: ['Tente novamente', 'Verifique os parâmetros', 'Tente mais tarde', 'Contate o suporte'],
       correctAnswer: 0,
-      explanation: error.message || 'Erro desconhecido. Verifique o console de desenvolvedor para mais detalhes.',
+      explanation: `A chamada para a API falhou. Causa: ${error.message || 'Erro desconhecido.'}. Verifique o console do navegador (aba 'Rede' e 'Console') e os logs da Cloud Function para mais detalhes.`,
       subject: subject,
     };
-    const fallbackQuestions: Question[] = Array.from({ length: numQuestions }, (_, i) => ({ ...fallbackQuestion, id: `error-${i}` }));
-    return fallbackQuestions;
+    return [fallbackQuestion];
   }
 };

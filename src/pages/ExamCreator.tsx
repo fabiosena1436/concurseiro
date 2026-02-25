@@ -90,6 +90,14 @@ export const ExamCreator: React.FC = () => {
       // O 'subject' enviado para a IA quando se usa edital é um resumo ou o título.
       const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
 
+      console.log("Enviando para a API:", {
+        subjectForApi,
+        numQuestions,
+        bancaApi,
+        difficulty,
+        editalContent: useEditalContent ? editalContent : undefined,
+      });
+
       const questionsToUse = await generateQuestionsFromBank(
         subjectForApi, 
         numQuestions, 
@@ -97,6 +105,8 @@ export const ExamCreator: React.FC = () => {
         difficulty, 
         useEditalContent ? editalContent : undefined
       );
+
+      console.log("Resposta da API:", questionsToUse);
 
       if (questionsToUse.length === 0 || questionsToUse[0]?.id.startsWith('error-')) {
         setError(questionsToUse[0]?.question || "Não foi possível gerar questões com os critérios fornecidos. Tente novamente.");

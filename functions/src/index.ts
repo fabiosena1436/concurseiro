@@ -39,30 +39,52 @@ const createPrompt = (data: {
   const { subject, numQuestions, banca, difficulty, editalContent } = data;
   const bancaStyle = bancaProfiles[banca] || bancaProfiles["Outra"];
   const context = getRelevantContext(editalContent || "");
+  const hasEdital = !!editalContent && editalContent.trim() !== '' && context !== "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
+
+  // Define o formato da questão e o número de opções
+  const isCespe = banca === "Cespe/Cebraspe";
+  const questionFormat = isCespe ? "'Certo' ou 'Errado'" : "Múltipla Escolha com 5 alternativas (A, B, C, D, E)";
+  const optionsArray = isCespe ? `["Certo", "Errado"]` : `["(string) Alternativa A", "(string) Alternativa B", "(string) Alternativa C", "(string) Alternativa D", "(string) Alternativa E"]`;
+  const optionsNote = isCespe 
+    ? "Para questões 'Certo ou Errado', o array de opções deve conter apenas duas strings: 'Certo' e 'Errado'."
+    : "Para questões de Múltipla Escolha, o array de opções deve conter exatamente 5 strings, uma para cada alternativa (A, B, C, D, E).";
+
+  const sourceOfTruth = hasEdital 
+    ? `**Fonte de Verdade (Contexto):** Use **EXCLUSIVAMENTE** as informações contidas na seção "CONTEXTO PARA QUESTÕES". Se o contexto for insuficiente, recuse-se a criar a questão.`
+    : `**Fonte de Verdade (Conhecimento Geral):** Use seu conhecimento aprofundado sobre o **Tópico Principal**.`;
+
+  const generationRules = hasEdital
+    ? `1. **FIDELIDADE AO CONTEXTO:** Baseie-se **ESTRITAMENTE** no "CONTEXTO PARA QUESTÕES".`
+    : `1. **BASE NO CONHECIMENTO:** Baseie-se em seu conhecimento sobre o **Tópico Principal**, garantindo precisão e relevância.`;
 
   return `
-    **Você é um Especialista em Concursos Públicos e membro da banca examinadora "${banca}".**
-    **Missão:** Gerar ${numQuestions} questões de concurso de altíssima qualidade.
-    **ETAPA 1: ANÁLISE DO CONTEXTO**
-    - **Nível de Dificuldade Alvo:** ${difficulty === "medio" ? "Ensino Médio" : "Ensino Superior"}.
+    **Você é um Especialista em Concursos Públicos criando questões para a banca "${banca}".**
+    **Missão:** Gerar ${numQuestions} questões de altíssima qualidade sobre o **Tópico Principal: "${subject}"**.
+
+    **ETAPA 1: REGRAS GERAIS**
+    - **Nível de Dificuldade:** ${difficulty === "medio" ? "Ensino Médio" : "Ensino Superior"}.
     - **Estilo da Banca (${banca}):** ${bancaStyle}.
-    - **Fonte de Verdade (Contexto):** Use **APENAS** as informações contidas na seção "CONTEXTO PARA QUESTÕES" abaixo. Se o contexto for insuficiente, recuse-se a criar a questão.
-    **CONTEXTO PARA QUESTÕES:**
+    - ${sourceOfTruth}
+    - **Formato da Questão:** ${questionFormat}.
+
+    **CONTEXTO PARA QUESTÕES (Use apenas se a Fonte de Verdade for 'Contexto'):**
     ---
     ${context}
     ---
-    **Tópico Principal (se o contexto for vazio):** ${subject}.
-    **ETAPA 2: REGRAS RÍGIDAS DE GERAÇÃO**
-    1.  **FIDELIDADE ABSOLUTA:** Crie todas as ${numQuestions} questões e suas explicações baseando-se **ESTRITAMENTE** no "CONTEXTO PARA QUESTÕES".
-    2.  **NÃO INVENTE:** Não adicione informações externas, mesmo que corretas. Se a resposta não estiver no contexto, a questão não pode ser criada.
-    3.  **VERIFICAÇÃO TRIPLA:** Antes de finalizar, revise cada questão para garantir que ela (a) respeita o estilo da banca, (b) é apropriada para o nível de dificuldade e (c) pode ser respondida **exclusivamente** com o contexto fornecido.
-    4.  **FORMATO JSON OBRIGATÓRIO:** A saída final deve ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos.
-    **ETAPA 3: GERAÇÃO E FORMATAÇÃO**
-    Produza o JSON com a seguinte estrutura para cada questão:
-    - "question": (string) O enunciado da pergunta.
-    - "options": (string[]) Um array com 4 opções de resposta.
-    - "correctAnswer": (number) O índice (0-3) da resposta correta.
-    - "explanation": (string) Uma explicação detalhada justificando a resposta correta com base no "CONTEXTO PARA QUESTÕES".
+
+    **ETAPA 2: REGRAS DE GERAÇÃO E FORMATAÇÃO**
+    ${generationRules}
+    2. **PROIBIDO META-QUESTÕES:** Não crie questões sobre "o contexto fornecido" ou a falta de informações. Foque apenas no **Tópico Principal**.
+    3. **ESTRUTURA JSON OBRIGATÓRIA:** A saída final **DEVE** ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos. Não inclua texto ou comentários fora do JSON.
+    
+    **ETAPA 3: ESTRUTURA DE CADA QUESTÃO NO JSON**
+    Cada objeto no array "questions" deve ter a seguinte estrutura:
+    {
+      "question": "(string) O enunciado completo da pergunta.",
+      "options": (string[]) Um array de strings. ${optionsNote},
+      "correctAnswer": (number) O índice da resposta correta (0 para 'Certo' ou 'A', 1 para 'Errado' ou 'B', e assim por diante).
+      "explanation": "(string) Uma explicação detalhada e clara, justificando a resposta correta com base na Fonte de Verdade."
+    }
   `;
 };
 
