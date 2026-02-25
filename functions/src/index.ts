@@ -7,7 +7,7 @@ import {defineString} from "firebase-functions/params";
 
 // 1. DEFINIÇÃO DE PARÂMETROS (A NOVA FORMA)
 const openAIKey = defineString("OPENAI_KEY");
-const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4-turbo"});
+const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-3.5-turbo"});
 
 // 2. CONFIGURAÇÃO DO CORS
 const corsHandler = cors({ origin: true });
@@ -44,7 +44,6 @@ const createPrompt = (data: {
   // Define o formato da questão e o número de opções
   const isCespe = banca === "Cespe/Cebraspe";
   const questionFormat = isCespe ? "'Certo' ou 'Errado'" : "Múltipla Escolha com 5 alternativas (A, B, C, D, E)";
-  const optionsArray = isCespe ? `["Certo", "Errado"]` : `["(string) Alternativa A", "(string) Alternativa B", "(string) Alternativa C", "(string) Alternativa D", "(string) Alternativa E"]`;
   const optionsNote = isCespe 
     ? "Para questões 'Certo ou Errado', o array de opções deve conter apenas duas strings: 'Certo' e 'Errado'."
     : "Para questões de Múltipla Escolha, o array de opções deve conter exatamente 5 strings, uma para cada alternativa (A, B, C, D, E).";
