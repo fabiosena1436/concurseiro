@@ -7,7 +7,7 @@ import {defineString} from "firebase-functions/params";
 
 // 1. DEFINIÇÃO DE PARÂMETROS (A NOVA FORMA)
 const openAIKey = defineString("OPENAI_KEY");
-const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-3.5-turbo"});
+const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4o-mini"});
 
 // 2. CONFIGURAÇÃO DO CORS
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
