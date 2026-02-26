@@ -8,7 +8,8 @@ export const generateQuestionsFromBank = async (
   numQuestions: number,
   banca: string,
   difficulty: 'medio' | 'superior',
-  editalContent?: string
+  editalContent?: string,
+  existingQuestions?: Question[]
 ): Promise<Question[]> => {
   try {
     const user = auth.currentUser;
@@ -31,6 +32,7 @@ export const generateQuestionsFromBank = async (
           banca,
           difficulty,
           editalContent,
+          existingQuestions,
         }
       }),
     });

@@ -10,7 +10,23 @@ const openAIKey = defineString("OPENAI_KEY");
 const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-3.5-turbo"});
 
 // 2. CONFIGURAÇÃO DO CORS
-const corsHandler = cors({ origin: true });
+// Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
+const whitelist = [
+  'http://localhost:5173', 
+  // 'https://seu-app-em-producao.web.app' 
+];
+
+const corsOptions = {
+  origin: function (origin: any, callback: any) {
+    if (whitelist.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+
+const corsHandler = cors(corsOptions);
 
 admin.initializeApp();
 
@@ -35,8 +51,9 @@ const createPrompt = (data: {
   banca: keyof typeof bancaProfiles;
   difficulty: string;
   editalContent?: string;
+  existingQuestions?: { question: string }[];
 }) => {
-  const { subject, numQuestions, banca, difficulty, editalContent } = data;
+  const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions } = data;
   const bancaStyle = bancaProfiles[banca] || bancaProfiles["Outra"];
   const context = getRelevantContext(editalContent || "");
   const hasEdital = !!editalContent && editalContent.trim() !== '' && context !== "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
@@ -44,11 +61,11 @@ const createPrompt = (data: {
   // Define o formato da questão e o número de opções
   const isCespe = banca === "Cespe/Cebraspe";
   const questionFormat = isCespe ? "'Certo' ou 'Errado'" : "Múltipla Escolha com 5 alternativas (A, B, C, D, E)";
-  const optionsNote = isCespe 
+  const optionsNote = isCespe
     ? "Para questões 'Certo ou Errado', o array de opções deve conter apenas duas strings: 'Certo' e 'Errado'."
     : "Para questões de Múltipla Escolha, o array de opções deve conter exatamente 5 strings, uma para cada alternativa (A, B, C, D, E).";
 
-  const sourceOfTruth = hasEdital 
+  const sourceOfTruth = hasEdital
     ? `**Fonte de Verdade (Contexto):** Use **EXCLUSIVAMENTE** as informações contidas na seção "CONTEXTO PARA QUESTÕES". Se o contexto for insuficiente, recuse-se a criar a questão.`
     : `**Fonte de Verdade (Conhecimento Geral):** Use seu conhecimento aprofundado sobre o **Tópico Principal**.`;
 
@@ -56,16 +73,26 @@ const createPrompt = (data: {
     ? `1. **FIDELIDADE AO CONTEXTO:** Baseie-se **ESTRITAMENTE** no "CONTEXTO PARA QUESTÕES".`
     : `1. **BASE NO CONHECIMENTO:** Baseie-se em seu conhecimento sobre o **Tópico Principal**, garantindo precisão e relevância.`;
 
+  const existingQuestionsSection = (existingQuestions && existingQuestions.length > 0)
+    ? `
+    **QUESTÕES EXISTENTES (PARA EVITAR REPETIÇÃO):**
+    Abaixo estão as questões que já foram geradas. **NÃO GERE** questões semanticamente iguais ou muito parecidas com estas.
+    ---
+    ${existingQuestions.map((q) => `- ${q.question}`).join("\n")}
+    ---
+    `
+    : "";
+
   return `
     **Você é um Especialista em Concursos Públicos criando questões para a banca "${banca}".**
-    **Missão:** Gerar ${numQuestions} questões de altíssima qualidade sobre o **Tópico Principal: "${subject}"**.
+    **Missão:** Gerar ${numQuestions} questões **NOVAS E DISTINTAS** de altíssima qualidade sobre o **Tópico Principal: "${subject}"**.
 
     **ETAPA 1: REGRAS GERAIS**
     - **Nível de Dificuldade:** ${difficulty === "medio" ? "Ensino Médio" : "Ensino Superior"}.
     - **Estilo da Banca (${banca}):** ${bancaStyle}.
     - ${sourceOfTruth}
     - **Formato da Questão:** ${questionFormat}.
-
+    ${existingQuestionsSection}
     **CONTEXTO PARA QUESTÕES (Use apenas se a Fonte de Verdade for 'Contexto'):**
     ---
     ${context}
@@ -73,8 +100,9 @@ const createPrompt = (data: {
 
     **ETAPA 2: REGRAS DE GERAÇÃO E FORMATAÇÃO**
     ${generationRules}
-    2. **PROIBIDO META-QUESTÕES:** Não crie questões sobre "o contexto fornecido" ou a falta de informações. Foque apenas no **Tópico Principal**.
-    3. **ESTRUTURA JSON OBRIGATÓRIA:** A saída final **DEVE** ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos. Não inclua texto ou comentários fora do JSON.
+    2. **EVITAR REPETIÇÃO:** É **PROIBIDO** criar questões que sejam semanticamente similares às listadas na seção "QUESTÕES EXISTENTES".
+    3. **PROIBIDO META-QUESTÕES:** Não crie questões sobre "o contexto fornecido" ou a falta de informações. Foque apenas no **Tópico Principal**.
+    4. **ESTRUTURA JSON OBRIGATÓRIA:** A saída final **DEVE** ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos. Não inclua texto ou comentários fora do JSON.
     
     **ETAPA 3: ESTRUTURA DE CADA QUESTÃO NO JSON**
     Cada objeto no array "questions" deve ter a seguinte estrutura:
@@ -115,7 +143,7 @@ export const generateQuestions = functions.https.onRequest((request, response) =
     
     const openai = new OpenAI({ apiKey });
     const data = request.body.data;
-    const { subject, numQuestions, banca, difficulty, editalContent } = data;
+    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions } = data;
 
     if (!subject || !numQuestions || !banca || !difficulty) {
       response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
@@ -123,7 +151,7 @@ export const generateQuestions = functions.https.onRequest((request, response) =
     }
 
     try {
-      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent });
+      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, existingQuestions });
       const completion = await openai.chat.completions.create({
         model: model,
         messages: [

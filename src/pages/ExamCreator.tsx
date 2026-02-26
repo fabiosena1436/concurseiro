@@ -89,6 +89,10 @@ export const ExamCreator: React.FC = () => {
     try {
       // O 'subject' enviado para a IA quando se usa edital é um resumo ou o título.
       const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
+      
+      const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
+      const existingQuestionsRaw = localStorage.getItem(storageKey);
+      const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
 
       console.log("Enviando para a API:", {
         subjectForApi,
@@ -96,6 +100,7 @@ export const ExamCreator: React.FC = () => {
         bancaApi,
         difficulty,
         editalContent: useEditalContent ? editalContent : undefined,
+        existingQuestions,
       });
 
       const questionsToUse = await generateQuestionsFromBank(
@@ -103,7 +108,8 @@ export const ExamCreator: React.FC = () => {
         numQuestions, 
         bancaApi,
         difficulty, 
-        useEditalContent ? editalContent : undefined
+        useEditalContent ? editalContent : undefined,
+        existingQuestions
       );
 
       console.log("Resposta da API:", questionsToUse);
@@ -113,6 +119,10 @@ export const ExamCreator: React.FC = () => {
         setIsLoading(false);
         return;
       }
+
+      const newQuestionTexts = questionsToUse.map(q => ({ question: q.question }));
+      const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts];
+      localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
       
       // 3. LÓGICA DE GERAÇÃO DE TÍTULO ATUALIZADA
       const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
