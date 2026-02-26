@@ -13,7 +13,7 @@ const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-3.5-turbo"});
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
 const whitelist = [
   'http://localhost:5173', 
-  // 'https://seu-app-em-producao.web.app' 
+  'https://concurseiro-three.vercel.app'
 ];
 
 const corsOptions = {
