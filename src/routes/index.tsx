@@ -9,6 +9,7 @@ import { Login } from "../pages/Login";
 import { Signup } from "../pages/Signup";
 import { ProtectedRoute } from "../components/common/ProtectedRoute";
 import { About } from "../pages/About";
+import AdminPage from "../pages/Admin"; // Import the new Admin page
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
         element: <Signup />,
       },
       {
+        // This group protects routes that require authentication
         element: <ProtectedRoute />,
         children: [
           {
@@ -49,6 +51,17 @@ export const router = createBrowserRouter([
           {
             path: "/resultados/:id",
             element: <Results />,
+          },
+        ]
+      },
+      {
+        // This group protects routes that require admin privileges
+        // We will enhance ProtectedRoute to check for an 'admin' role
+        element: <ProtectedRoute adminRequired={true} />,
+        children: [
+          {
+            path: "/admin",
+            element: <AdminPage />,
           },
         ]
       }
