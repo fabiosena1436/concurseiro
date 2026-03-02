@@ -22,7 +22,8 @@ import {
 export const Header: React.FC = () => {
   const {
     user,
-    userData
+    userData,
+    isAdmin
   } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -49,6 +50,11 @@ export const Header: React.FC = () => {
       {user && (
         <ListItemButton component={Link} to="/dashboard" onClick={handleDrawerToggle}>
           <ListItemText primary="Dashboard" />
+        </ListItemButton>
+      )}
+      {isAdmin && (
+        <ListItemButton component={Link} to="/admin" onClick={handleDrawerToggle}>
+          <ListItemText primary="Admin" />
         </ListItemButton>
       )}
       <ListItemButton component={Link} to="/criar-simulado" onClick={handleDrawerToggle}>
@@ -117,6 +123,11 @@ export const Header: React.FC = () => {
             {user && (
               <Button color="inherit" component={Link} to="/dashboard">
                 Dashboard
+              </Button>
+            )}
+            {isAdmin && (
+              <Button color="inherit" component={Link} to="/admin">
+                Admin
               </Button>
             )}
             <Button color="inherit" component={Link} to="/criar-simulado">
