@@ -149,10 +149,16 @@ export const generateQuestions = functions.https.onRequest((request, response) =
     try {
       // --- STEP 1: Fetch from Question Bank ---
       const questionBankRef = db.collection('questionBank');
+      
+      // Map form difficulty to database values
+      const difficultyQueryValues = difficulty === 'medio'
+          ? ['facil', 'medio']
+          : ['dificil'];
+
       const querySnapshot = await questionBankRef
         .where('subject', '==', subject)
         .where('banca', '==', banca)
-        // .where('difficulty', '==', difficulty) // Optional: add if you want stricter matching
+        .where('difficulty', 'in', difficultyQueryValues)
         .get();
 
       let availableQuestions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));

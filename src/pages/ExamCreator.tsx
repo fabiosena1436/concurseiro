@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../services/firebase';
-import { createExam, getQuestionsFromFirestore } from '../services/firestoreService';
+import { createExam } from '../services/firestoreService';
 import { generateQuestionsFromBank } from '../services/aiService';
 import { type Question } from '../types/exam';
 import {
@@ -18,10 +18,6 @@ import {
   Alert,
   FormControlLabel,
   Checkbox,
-  RadioGroup,
-  Radio,
-  FormLabel,
-  Stack,
 } from '@mui/material';
 
 const bancas = [
@@ -49,81 +45,19 @@ export const ExamCreator: React.FC = () => {
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
   const [difficulty, setDifficulty] = useState<'medio' | 'superior'>('medio');
-  const [questionSource, setQuestionSource] = useState<'ia' | 'banco'>('ia');
   const [useEditalContent, setUseEditalContent] = useState(false);
   const [editalContent, setEditalContent] = useState('');
   const [editalTitle, setEditalTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showFallbackConfirmation, setShowFallbackConfirmation] = useState(false);
-
-  const handleCreateExam = async (questions: Question[]) => {
-    if (!auth.currentUser) return;
-
-    const finalSubject = useEditalContent ? editalTitle.trim() : (subject === 'Outra' ? customSubject.trim() : subject);
-    const bancaDisplay = banca === 'Outra' ? customBanca.trim() : banca;
-    const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
-
-    const examData = {
-      title: examTitle,
-      creatorId: auth.currentUser.uid,
-      questions: questions,
-      banca: bancaDisplay,
-    };
-
-    const examId = await createExam(examData);
-    navigate(`/simulado/${examId}`);
-  };
-
-  const handleAIFallback = async () => {
-    setShowFallbackConfirmation(false);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-        const finalSubject = useEditalContent ? editalTitle.trim() : (subject === 'Outra' ? customSubject.trim() : subject);
-        const bancaApi = banca === 'Outra' ? 'Outra' : banca;
-        const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
-        
-        const rawQuestions = await generateQuestionsFromBank(
-            subjectForApi, 
-            numQuestions, 
-            bancaApi,
-            difficulty, 
-            useEditalContent ? editalContent : undefined,
-            [] // Não usar questões existentes no modo fallback para garantir novas questões
-        );
-
-        if (rawQuestions.length === 0 || rawQuestions[0]?.id.startsWith('error-')) {
-            setError(rawQuestions[0]?.question || "A geração com IA também falhou. Tente novamente mais tarde.");
-            return;
-        }
-
-        const questionsToUse = rawQuestions.map(q => ({ ...q, source: 'Inteligência Artificial' } as Question));
-        await handleCreateExam(questionsToUse);
-
-    } catch (err) {
-        console.error("Erro no fallback de IA: ", err);
-        const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
-        setError(`Falha ao criar o simulado com IA: ${errorMessage}`);
-    } finally {
-        setIsLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setShowFallbackConfirmation(false);
 
     if (!auth.currentUser) {
       setError("Você precisa estar logado para criar um simulado.");
       return;
-    }
-
-    if (useEditalContent && questionSource === 'banco') {
-        setError("A geração a partir do edital só está disponível com a fonte de questões 'IA'.");
-        return;
     }
 
     if (useEditalContent) {
@@ -140,46 +74,56 @@ export const ExamCreator: React.FC = () => {
     }
     
     const bancaDisplay = banca === 'Outra' ? customBanca.trim() : banca;
+    const bancaApi = banca === 'Outra' ? 'Outra' : banca;
 
     setIsLoading(true);
 
     try {
-        if (questionSource === 'banco') {
-            const questionsFromBank = await getQuestionsFromFirestore(finalSubject, numQuestions, bancaDisplay, difficulty);
-            if (questionsFromBank.length === 0) {
-                setShowFallbackConfirmation(true);
-                setIsLoading(false);
-                return; 
-            }
-            await handleCreateExam(questionsFromBank);
-        } else { // questionSource === 'ia'
-            const bancaApi = banca === 'Outra' ? 'Outra' : banca;
-            const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
-            
-            const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
-            const existingQuestionsRaw = localStorage.getItem(storageKey);
-            const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
+        const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
+        
+        const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
+        const existingQuestionsRaw = localStorage.getItem(storageKey);
+        const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
 
-            const rawQuestions = await generateQuestionsFromBank(
-                subjectForApi, numQuestions, bancaApi, difficulty, 
-                useEditalContent ? editalContent : undefined, existingQuestions
-            );
+        const rawQuestions = await generateQuestionsFromBank(
+            subjectForApi, numQuestions, bancaApi, difficulty, 
+            useEditalContent ? editalContent : undefined, existingQuestions
+        );
 
-            if (rawQuestions.length === 0 || rawQuestions[0]?.id.startsWith('error-')) {
-                setError(rawQuestions[0]?.question || "Não foi possível gerar questões com a IA. Tente outros parâmetros.");
-                return;
-            }
-
-            const questionsToUse = rawQuestions.map(q => ({ ...q, source: 'Inteligência Artificial' } as Question));
-
-            if (questionsToUse.length > 0 && !questionsToUse[0]?.id.startsWith('error-')) {
-                const newQuestionTexts = questionsToUse.map(q => ({ question: q.question }));
-                const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts];
-                localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
-            }
-
-            await handleCreateExam(questionsToUse);
+        if (rawQuestions.length === 0 || rawQuestions[0]?.id.startsWith('error-')) {
+            setError(rawQuestions[0]?.question || "Não foi possível gerar questões com os critérios fornecidos. Tente novamente.");
+            setIsLoading(false);
+            return;
         }
+
+        // Adiciona a origem com base no campo 'createdBy' retornado pelo backend
+        const questionsWithSource = rawQuestions.map(q => ({
+            ...q,
+            source: q.createdBy === 'ai_generated' ? 'Inteligência Artificial' : 'Banco de Questões',
+        }));
+
+        // Lógica de armazenamento no LocalStorage para evitar repetições na geração com IA
+        const newAiQuestionTexts = questionsWithSource
+            .filter(q => q.source === 'Inteligência Artificial')
+            .map(q => ({ question: q.question }));
+
+        if (newAiQuestionTexts.length > 0) {
+            const allQuestionsToStore = [...existingQuestions, ...newAiQuestionTexts];
+            localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
+        }
+
+        const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
+
+        const examData = {
+            title: examTitle,
+            creatorId: auth.currentUser.uid,
+            questions: questionsWithSource,
+            banca: bancaDisplay,
+        };
+
+        const examId = await createExam(examData);
+        navigate(`/simulado/${examId}`);
+
     } catch (err) {
       console.error("Erro ao criar o simulado: ", err);
       const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
@@ -195,32 +139,11 @@ export const ExamCreator: React.FC = () => {
         Criar Simulado
       </Typography>
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-        <FormControl component="fieldset" margin="normal">
-            <FormLabel component="legend">Fonte das Questões</FormLabel>
-            <RadioGroup
-                row
-                aria-label="question-source"
-                name="question-source"
-                value={questionSource}
-                onChange={(e) => {
-                    const source = e.target.value as 'ia' | 'banco';
-                    setQuestionSource(source);
-                    if (source === 'banco' && useEditalContent) {
-                        setUseEditalContent(false);
-                    }
-                }}
-            >
-                <FormControlLabel value="ia" control={<Radio />} label="Gerar com IA" />
-                <FormControlLabel value="banco" control={<Radio />} label="Banco de Questões" />
-            </RadioGroup>
-        </FormControl>
-
         <FormControlLabel
           control={
             <Checkbox 
               checked={useEditalContent} 
               onChange={(e) => setUseEditalContent(e.target.checked)} 
-              disabled={questionSource === 'banco'}
             />
           }
           label="Gerar questões a partir do conteúdo do edital"
@@ -318,32 +241,14 @@ export const ExamCreator: React.FC = () => {
         
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
-        {showFallbackConfirmation && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-                <Stack spacing={2}>
-                    <Typography>
-                        Não foram encontradas questões no banco para a matéria selecionada. Deseja usar a IA para gerá-las?
-                    </Typography>
-                    <Box>
-                        <Button variant="contained" onClick={handleAIFallback} sx={{ mr: 1 }}>
-                            Sim, gerar com IA
-                        </Button>
-                        <Button variant="outlined" onClick={() => setShowFallbackConfirmation(false)}>
-                            Não, obrigado
-                        </Button>
-                    </Box>
-                </Stack>
-            </Alert>
-        )}
-
         <Button
           type="submit"
           fullWidth
           variant="contained"
           sx={{ mt: 3, mb: 2 }}
-          disabled={isLoading || showFallbackConfirmation}
+          disabled={isLoading}
         >
-          {isLoading ? <CircularProgress size={24} /> : 'Criar Simulado'}
+          {isLoading ? <CircularProgress size={24} /> : 'Gerar Simulado'}
         </Button>
       </Box>
     </Container>

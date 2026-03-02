@@ -18,52 +18,6 @@ import type { Result } from "../types/result";
 
 const examsCollection = collection(db, "exams");
 const resultsCollection = collection(db, "results");
-const questionsCollection = collection(db, "manualQuestions");
-
-/**
- * Busca questões do banco de dados do Firestore com base nos critérios.
- * @param subject - A matéria das questões.
- * @param numQuestions - O número de questões a serem retornadas.
- * @param banca - A banca examinadora.
- * @param difficulty - O nível de dificuldade selecionado no formulário ('medio' ou 'superior').
- * @returns Uma lista de questões.
- */
-export const getQuestionsFromFirestore = async (
-  subject: string,
-  numQuestions: number,
-  banca: string,
-  difficulty: 'medio' | 'superior'
-): Promise<Question[]> => {
-  try {
-    // Mapeia a seleção do formulário para os valores no banco de dados.
-    const difficultyQueryValues = difficulty === 'medio'
-      ? ['facil', 'medio']
-      : ['dificil'];
-
-    const q = query(
-      questionsCollection,
-      where("subject", "==", subject),
-      where("banca", "==", banca),
-      where("difficulty", "in", difficultyQueryValues)
-    );
-
-    const querySnapshot = await getDocs(q);
-    const allQuestions = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      source: 'Banco de Questões', // Adiciona a origem da questão
-    } as Question));
-
-    // Embaralhar e cortar o número de questões
-    const shuffled = allQuestions.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, numQuestions);
-
-  } catch (error) {
-    console.error("Erro ao buscar questões do Firestore:", error);
-    return []; // Retorna vazio em caso de erro para o fluxo de fallback funcionar
-  }
-};
-
 
 /**
  * Cria um novo simulado no Firestore.
