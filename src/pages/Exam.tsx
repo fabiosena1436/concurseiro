@@ -18,8 +18,11 @@ import {
   Grid,
   Chip,
   CircularProgress,
-  Paper
+  Paper,
+  Alert,
+  AlertTitle
 } from '@mui/material';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 
 export const Exam: React.FC = () => {
   const { id: examId } = useParams<{ id: string }>();
@@ -151,14 +154,22 @@ export const Exam: React.FC = () => {
 
   const selectedAnswer = userAnswers[currentQuestion.id];
   const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+  const questionSource = exam.questions[0]?.source;
 
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h4" component="h1">{exam.title}</Typography>
         <Chip label={`Tempo: ${formatTime(timeLeft)}`} color="secondary" />
       </Box>
+
+      {questionSource && (
+        <Alert severity="info" icon={<InfoOutlined />} sx={{ mb: 3 }}>
+          <AlertTitle>Origem das Questões</AlertTitle>
+          Este simulado foi gerado utilizando: <strong>{questionSource}</strong>.
+        </Alert>
+      )}
 
       <Card component={Paper} elevation={3}>
         <CardContent>

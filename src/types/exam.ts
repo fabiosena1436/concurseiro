@@ -5,6 +5,7 @@ export type Question = {
   correctAnswer: number;
   explanation?: string;
   subject: string;
+  source?: 'Banco de Questões' | 'Inteligência Artificial';
 };
 
 export type Exam = {
