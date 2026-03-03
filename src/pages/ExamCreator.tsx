@@ -25,6 +25,8 @@ const bancas = [
     "Fundação Getúlio Vargas (FGV)",
     "Fundação Cesgranrio",
     "Fundação Carlos Chagas (FCC)",
+    "VUNESP",
+    "KLC",
     "Outra"
 ];
 
@@ -33,6 +35,7 @@ const subjects: string[] = [
     "Matemática",
     "Informática",
     "Direito",
+    "Professor de Informática",
     "Outra"
 ];
 
@@ -40,6 +43,7 @@ const subjects: string[] = [
 export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
   const [subject, setSubject] = useState<string>(subjects[0]);
+  const [topic, setTopic] = useState('');
   const [customSubject, setCustomSubject] = useState('');
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
@@ -79,7 +83,11 @@ export const ExamCreator: React.FC = () => {
     setIsLoading(true);
 
     try {
-        const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
+        const subjectForApi = useEditalContent 
+            ? `Questões sobre o edital: ${finalSubject}` 
+            : topic.trim() 
+                ? `${finalSubject} (Tema: ${topic.trim()})` 
+                : finalSubject;
         
         const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
         const existingQuestionsRaw = localStorage.getItem(storageKey);
@@ -193,6 +201,16 @@ export const ExamCreator: React.FC = () => {
                 required={subject === 'Outra'}
               />
             )}
+
+            <TextField
+              fullWidth
+              margin="normal"
+              id="topic"
+              label="Tema Específico (Opcional)"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="Ex: Crase, Funções de 1º Grau"
+            />
           </>
         )}
 
