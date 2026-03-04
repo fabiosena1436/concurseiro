@@ -47,8 +47,13 @@ export const generateQuestionsFromBank = async (
       throw new Error(errorPayload.message || 'Falha ao buscar dados.');
     }
 
-    // O SDK do cliente espera que a resposta esteja dentro de um objeto 'data'
-    const questions = result.data as Question[];
+    // The raw HTTP response from a callable function wraps the payload in a 'result' key.
+    const questions = result.result as Question[];
+
+    if (!Array.isArray(questions)) {
+        console.error("A API não retornou um array de questões no campo 'result'. Resposta recebida:", result);
+        throw new Error("A resposta da API de geração de questões não teve o formato esperado.");
+    }
     
     return questions.map((q, index) => ({
       ...q,
