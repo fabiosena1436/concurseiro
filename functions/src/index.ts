@@ -133,8 +133,9 @@ export const generateQuestions = functions.https.onCall(async (data, context) =>
     let availableQuestions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     // Filter out questions the user has already seen
-    if (userHistory && userHistory.length > 0) {
-      const userHistoryIds = new Set(userHistory.map((q: any) => q.id));
+    const userHistorySafe = userHistory ?? [];
+    if (userHistorySafe.length > 0) {
+      const userHistoryIds = new Set(userHistorySafe.map((q: any) => q.id));
       availableQuestions = availableQuestions.filter(q => !userHistoryIds.has(q.id));
     }
     
