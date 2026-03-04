@@ -25,9 +25,12 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 
 
+import { SubjectAnalytics } from '../components/analytics/SubjectAnalytics';
+
 interface ResultWithExamTitle extends Result {
   examTitle: string;
 }
+
 
 const getScoreColor = (score: number) => {
   if (score >= 70) return 'success.main';
@@ -115,6 +118,8 @@ export const Dashboard: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Meu Desempenho
       </Typography>
+
+      <SubjectAnalytics />
 
       <Paper elevation={3} sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
         <Typography variant="h5" component="h2" color="primary" gutterBottom>

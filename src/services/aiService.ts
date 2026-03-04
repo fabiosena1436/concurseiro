@@ -27,7 +27,13 @@ export const generateQuestionsFromBank = async (
       existingQuestions,
     });
     
-    const questions = result.data || [];
+    const questions = result.data;
+
+    if (!Array.isArray(questions)) {
+      console.error("A API não retornou um array de questões.", questions);
+      // Retorna uma questão de fallback para que o usuário saiba que algo deu errado
+      throw new Error("A resposta da API de geração de questões não está no formato esperado (não é um array).");
+    }
     
     // O mapeamento de ID pode não ser mais necessário se a função já retorna IDs únicos
     return questions.map((q) => ({
