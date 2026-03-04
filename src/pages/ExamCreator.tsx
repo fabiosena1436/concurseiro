@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { auth } from '../services/firebase';
 import { createExam } from '../services/firestoreService';
 import { generateQuestionsFromBank } from '../services/aiService';
-import { type Question } from '../types/exam';
 import {
   Container,
   Typography,
@@ -39,6 +38,10 @@ const subjects: string[] = [
     "Outra"
 ];
 
+
+interface StoredQuestion {
+  question: string;
+}
 
 export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
@@ -91,7 +94,7 @@ export const ExamCreator: React.FC = () => {
         
         const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
         const existingQuestionsRaw = localStorage.getItem(storageKey);
-        const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
+        const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) as StoredQuestion[] : [];
 
         const rawQuestions = await generateQuestionsFromBank(
             subjectForApi, numQuestions, bancaApi, difficulty, 
@@ -120,6 +123,7 @@ export const ExamCreator: React.FC = () => {
             localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
         }
 
+
         const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
 
         const examData = {
@@ -146,7 +150,7 @@ export const ExamCreator: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Criar Simulado
       </Typography>
-      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+      <Box component="form" onSubmit={(e) => void handleSubmit(e)} sx={{ mt: 3 }}>
         <FormControlLabel
           control={
             <Checkbox 

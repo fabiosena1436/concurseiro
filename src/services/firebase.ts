@@ -4,12 +4,12 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 
-const apiKey = import.meta.env.VITE_API_KEY;
-const authDomain = import.meta.env.VITE_AUTH_DOMAIN;
-const projectId = import.meta.env.VITE_PROJECT_ID;
-const storageBucket = import.meta.env.VITE_STORAGE_BUCKET;
-const messagingSenderId = import.meta.env.VITE_MESSAGING_SENDER_ID;
-const appId = import.meta.env.VITE_APP_ID;
+const apiKey = import.meta.env.VITE_API_KEY as string;
+const authDomain = import.meta.env.VITE_AUTH_DOMAIN as string;
+const projectId = import.meta.env.VITE_PROJECT_ID as string;
+const storageBucket = import.meta.env.VITE_STORAGE_BUCKET as string;
+const messagingSenderId = import.meta.env.VITE_MESSAGING_SENDER_ID as string;
+const appId = import.meta.env.VITE_APP_ID as string;
 
 if (!apiKey || !authDomain || !projectId || !storageBucket || !messagingSenderId || !appId) {
   throw new Error(

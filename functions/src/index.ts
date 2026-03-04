@@ -2,30 +2,11 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
-import * as cors from "cors";
 import {defineString} from "firebase-functions/params";
 
 // 1. DEFINIÇÃO DE PARÂMETROS
 const openAIKey = defineString("OPENAI_KEY");
 const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4o-mini"});
-
-// 2. CONFIGURAÇÃO DO CORS
-const whitelist = [
-  'http://localhost:5173', 
-  'https://concurseiro-three.vercel.app'
-];
-
-const corsOptions = {
-  origin: function (origin: any, callback: any) {
-    if (whitelist.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
-};
-
-const corsHandler = cors(corsOptions);
 
 admin.initializeApp();
 const db = admin.firestore(); // NEW: Firestore DB instance
@@ -115,254 +96,226 @@ const createPrompt = (data: {
   `;
 };
 
-// --- MAIN FUNCTION (Heavily refactored) ---
-export const generateQuestions = functions.https.onRequest((request, response) => {
-  corsHandler(request, response, async () => {
-    // --- AUTHENTICATION ---
-    const idToken = request.headers.authorization?.split("Bearer ")[1];
-    if (!idToken) {
-      response.status(401).send({ error: { message: "Unauthorized. No token provided.", status: "UNAUTHENTICATED" } });
-      return;
-    }
-    try {
-      await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-      console.error("Error verifying ID token:", error);
-      response.status(401).send({ error: { message: "Unauthorized. Invalid token.", status: "UNAUTHENTICATED" } });
-      return;
-    }
 
-    // --- PARAMETERS & VALIDATION ---
-    const apiKey = openAIKey.value();
-    const model = openAIModel.value();
-    if (!apiKey) {
-      response.status(500).send({ error: { message: "A chave da API do OpenAI não está configurada.", status: "FAILED_PRECONDITION" } });
-      return;
+export const generateQuestions = functions.https.onCall(async (data, context) => {
+  // --- AUTHENTICATION ---
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "The function must be called while authenticated.");
+  }
+
+  // --- PARAMETERS & VALIDATION ---
+  const apiKey = openAIKey.value();
+  const model = openAIModel.value();
+  if (!apiKey) {
+    throw new functions.https.HttpsError("failed-precondition", "The OpenAI API key is not configured.");
+  }
+
+  const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions: userHistory } = data;
+  if (!subject || !numQuestions || !banca || !difficulty) {
+    throw new functions.https.HttpsError("invalid-argument", "The 'subject', 'numQuestions', 'banca', and 'difficulty' arguments are required.");
+  }
+
+  try {
+    // --- STEP 1: Fetch from Question Bank ---
+    const questionBankRef = db.collection('questionBank');
+    
+    // Map form difficulty to database values
+    const difficultyQueryValues = difficulty === 'medio'
+        ? ['facil', 'medio']
+        : ['dificil'];
+
+    const querySnapshot = await questionBankRef
+      .where('subject', '==', subject)
+      .where('banca', '==', banca)
+      .where('difficulty', 'in', difficultyQueryValues)
+      .get();
+
+    let availableQuestions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Filter out questions the user has already seen
+    if (userHistory && userHistory.length > 0) {
+      const userHistoryIds = new Set(userHistory.map((q: any) => q.id));
+      availableQuestions = availableQuestions.filter(q => !userHistoryIds.has(q.id));
     }
     
-    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions: userHistory } = request.body.data;
-    if (!subject || !numQuestions || !banca || !difficulty) {
-      response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
-      return;
-    }
+    const questionsFromBank = availableQuestions.slice(0, numQuestions);
+    
+    let allQuestions = [...questionsFromBank];
+    const questionsToGenerate = numQuestions - allQuestions.length;
 
-    try {
-      // --- STEP 1: Fetch from Question Bank ---
-      const questionBankRef = db.collection('questionBank');
+    // --- STEP 2: Generate missing questions with AI (if needed) ---
+    if (questionsToGenerate > 0) {
+      const openai = new OpenAI({ apiKey });
       
-      // Map form difficulty to database values
-      const difficultyQueryValues = difficulty === 'medio'
-          ? ['facil', 'medio']
-          : ['dificil'];
+      // Use existing questions (from bank AND user history) to prevent duplicates
+      const questionsForPrompt = [
+          ...(userHistory || []),
+          ...allQuestions
+      ].map(q => ({ question: q.question }));
 
-      const querySnapshot = await questionBankRef
-        .where('subject', '==', subject)
-        .where('banca', '==', banca)
-        .where('difficulty', 'in', difficultyQueryValues)
-        .get();
-
-      let availableQuestions = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Filter out questions the user has already seen
-      if (userHistory && userHistory.length > 0) {
-        const userHistoryIds = new Set(userHistory.map((q: any) => q.id));
-        availableQuestions = availableQuestions.filter(q => !userHistoryIds.has(q.id));
-      }
-      
-      const questionsFromBank = availableQuestions.slice(0, numQuestions);
-      
-      let allQuestions = [...questionsFromBank];
-      const questionsToGenerate = numQuestions - allQuestions.length;
-
-      // --- STEP 2: Generate missing questions with AI (if needed) ---
-      if (questionsToGenerate > 0) {
-        const openai = new OpenAI({ apiKey });
-        
-        // Use existing questions (from bank AND user history) to prevent duplicates
-        const questionsForPrompt = [
-            ...(userHistory || []),
-            ...allQuestions
-        ].map(q => ({ question: q.question }));
-
-        const prompt = createPrompt({ 
-            subject, 
-            numQuestions: questionsToGenerate, 
-            banca, 
-            difficulty, 
-            editalContent, 
-            existingQuestions: questionsForPrompt 
-        });
-
-        const completion = await openai.chat.completions.create({
-          model: model,
-          messages: [{ role: "system", content: "Você é um assistente especialista em criar questões de concursos públicos. Sua única função é gerar um objeto JSON válido." }, { role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-        });
-
-        const responseContent = completion.choices[0]?.message?.content;
-        if (!responseContent) {
-          throw new functions.https.HttpsError("internal", "A resposta da IA está vazia ou nula.");
-        }
-
-        const responseObject = JSON.parse(responseContent);
-        if (!Array.isArray(responseObject.questions)) {
-          throw new functions.https.HttpsError("internal", "A resposta da IA não contém um array 'questions'.");
-        }
-        
-        const newAiQuestions = responseObject.questions;
-
-        // --- STEP 3: Save new questions to the bank ---
-        const batch = db.batch();
-        const savedQuestions = [];
-
-        for (const q of newAiQuestions) {
-            const newDocRef = questionBankRef.doc(); // Create a new document with a unique ID
-            const questionData = {
-                ...q,
-                subject,
-                banca,
-                difficulty,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                createdBy: 'ai_generated'
-            };
-            batch.set(newDocRef, questionData);
-            savedQuestions.push({ id: newDocRef.id, ...questionData });
-        }
-        await batch.commit();
-
-        allQuestions = [...allQuestions, ...savedQuestions];
-      }
-      
-      // Shuffle the final list to mix bank and new questions
-      allQuestions.sort(() => Math.random() - 0.5);
-
-      response.status(200).send({ data: allQuestions.slice(0, numQuestions) });
-
-    } catch (error: any) {
-      console.error("Error in generateQuestions function:", {
-        errorMessage: error.message,
-        errorCode: error.code,
+      const prompt = createPrompt({ 
+          subject, 
+          numQuestions: questionsToGenerate, 
+          banca, 
+          difficulty, 
+          editalContent, 
+          existingQuestions: questionsForPrompt 
       });
-      const status = error.httpsErrorCode?.status || "INTERNAL";
-      response.status(500).send({ error: { message: "Ocorreu um erro interno.", status: status, details: { originalError: error.message } } });
+
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: [{ role: "system", content: "Você é um assistente especialista em criar questões de concursos públicos. Sua única função é gerar um objeto JSON válido." }, { role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new functions.https.HttpsError("internal", "The AI response is empty or null.");
+      }
+
+      const responseObject = JSON.parse(responseContent);
+      if (!Array.isArray(responseObject.questions)) {
+        throw new functions.https.HttpsError("internal", "The AI response does not contain a 'questions' array.");
+      }
+      
+      const newAiQuestions = responseObject.questions;
+
+      // --- STEP 3: Save new questions to the bank ---
+      const batch = db.batch();
+      const savedQuestions = [];
+
+      for (const q of newAiQuestions) {
+          const newDocRef = questionBankRef.doc(); // Create a new document with a unique ID
+          const questionData = {
+              ...q,
+              subject,
+              banca,
+              difficulty,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              createdBy: 'ai_generated'
+          };
+          batch.set(newDocRef, questionData);
+          savedQuestions.push({ id: newDocRef.id, ...questionData });
+      }
+      await batch.commit();
+
+      allQuestions = [...allQuestions, ...savedQuestions];
     }
-  });
+    
+    // Shuffle the final list to mix bank and new questions
+    allQuestions.sort(() => Math.random() - 0.5);
+
+    return allQuestions.slice(0, numQuestions);
+
+  } catch (error: any) {
+    console.error("Error in generateQuestions function:", {
+      errorMessage: error.message,
+      errorCode: error.code,
+    });
+    throw new functions.https.HttpsError("internal", "An internal error occurred.", { originalError: error.message });
+  }
 });
 
 // --- NEW: Function to manually add a question ---
-export const addQuestionManually = functions.https.onRequest((request, response) => {
-    corsHandler(request, response, async () => {
-        // 1. Verify Authentication and Admin Role
-        const idToken = request.headers.authorization?.split("Bearer ")[1];
-        if (!idToken) {
-            response.status(401).send({ error: { message: "Unauthorized. No token provided.", status: "UNAUTHENTICATED" } });
-            return;
-        }
+export const addQuestionManually = functions.https.onCall(async (data, context) => {
+    // 1. Verify Authentication and Admin Role
+    if (context.auth?.token.admin !== true) {
+        throw new functions.https.HttpsError("permission-denied", "Only admins can add questions.");
+    }
 
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(idToken);
-        } catch (error) {
-            response.status(401).send({ error: { message: "Unauthorized. Invalid token.", status: "UNAUTHENTICATED" } });
-            return;
-        }
+    // 2. Get and Validate Data
+    const { subject, topic, question, options, correctAnswer, explanation, banca, difficulty } = data;
+    if (!subject || !topic || !question || !options || correctAnswer === undefined || !explanation || !banca || !difficulty) {
+        throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+    }
 
-        if (decodedToken.admin !== true) {
-            response.status(403).send({ error: { message: "Forbidden. User is not an admin.", status: "PERMISSION_DENIED" } });
-            return;
-        }
+    // 3. Save to Firestore
+    try {
+        const questionBankRef = db.collection('questionBank');
+        const newQuestion = {
+            subject,
+            topic,
+            question,
+            options,
+            correctAnswer,
+            explanation,
+            banca,
+            difficulty,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: 'admin',
+            authorUid: context.auth.uid
+        };
 
-        // 2. Get and Validate Data
-        const { subject, topic, question, options, correctAnswer, explanation, banca, difficulty } = request.body.data;
-        if (!subject || !topic || !question || !options || correctAnswer === undefined || !explanation || !banca || !difficulty) {
-            response.status(400).send({ error: { message: "Missing required fields.", status: "INVALID_ARGUMENT" } });
-            return;
-        }
+        const docRef = await questionBankRef.add(newQuestion);
+        return { id: docRef.id, ...newQuestion };
 
-        // 3. Save to Firestore
-        try {
-            const questionBankRef = db.collection('questionBank');
-            const newQuestion = {
-                subject,
-                topic,
-                question,
-                options,
-                correctAnswer,
-                explanation,
-                banca,
-                difficulty,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                createdBy: 'admin',
-                authorUid: decodedToken.uid
-            };
-
-            const docRef = await questionBankRef.add(newQuestion);
-            response.status(201).send({ data: { id: docRef.id, ...newQuestion } });
-
-        } catch (error) {
-            console.error("Error saving question to Firestore:", error);
-            response.status(500).send({ error: { message: "Internal server error while saving question.", status: "INTERNAL" } });
-        }
-    });
+    } catch (error) {
+        console.error("Error saving question to Firestore:", error);
+        throw new functions.https.HttpsError("internal", "Internal server error while saving question.");
+    }
 });
 
-export const addQuestionsBatch = functions.https.onRequest((request, response) => {
-    corsHandler(request, response, async () => {
-        // 1. Verify Authentication and Admin Role
-        const idToken = request.headers.authorization?.split("Bearer ")[1];
-        if (!idToken) {
-            response.status(401).send({ error: { message: "Unauthorized. No token provided.", status: "UNAUTHENTICATED" } });
-            return;
-        }
+export const addQuestionsBatch = functions.https.onCall(async (data, context) => {
+    // 1. Verify Authentication and Admin Role
+    if (context.auth?.token.admin !== true) {
+        throw new functions.https.HttpsError("permission-denied", "Only admins can add questions in batch.");
+    }
 
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(idToken);
-        } catch (error) {
-            response.status(401).send({ error: { message: "Unauthorized. Invalid token.", status: "UNAUTHENTICATED" } });
-            return;
-        }
+    // 2. Get and Validate Data
+    const questions = data.questions;
+    if (!Array.isArray(questions) || questions.length === 0) {
+        throw new functions.https.HttpsError("invalid-argument", "Request body must contain a non-empty 'questions' array.");
+    }
 
-        if (decodedToken.admin !== true) {
-            response.status(403).send({ error: { message: "Forbidden. User is not an admin.", status: "PERMISSION_DENIED" } });
-            return;
-        }
-
-        // 2. Get and Validate Data
-        const questions = request.body.data.questions;
-        if (!Array.isArray(questions) || questions.length === 0) {
-            response.status(400).send({ error: { message: "Request body must contain a non-empty 'questions' array.", status: "INVALID_ARGUMENT" } });
-            return;
-        }
-
-        // 3. Save to Firestore using a Batch
-        try {
-            const batch = db.batch();
-            const questionBankRef = db.collection('questionBank');
-            
-            for (const q of questions) {
-                // Basic validation for each question object
-                if (!q.subject || !q.topic || !q.question || !q.options || q.correctAnswer === undefined || !q.explanation || !q.banca || !q.difficulty) {
-                   console.warn("Skipping invalid question object:", q);
-                   continue; // Skip invalid objects
-                }
-
-                const newDocRef = questionBankRef.doc(); // auto-generate ID
-                const newQuestionData = {
-                    ...q,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    createdBy: 'admin-batch',
-                    authorUid: decodedToken.uid
-                };
-                batch.set(newDocRef, newQuestionData);
+    // 3. Save to Firestore using a Batch
+    try {
+        const batch = db.batch();
+        const questionBankRef = db.collection('questionBank');
+        
+        for (const q of questions) {
+            // Basic validation for each question object
+            if (!q.subject || !q.topic || !q.question || !q.options || q.correctAnswer === undefined || !q.explanation || !q.banca || !q.difficulty) {
+               console.warn("Skipping invalid question object:", q);
+               continue; // Skip invalid objects
             }
 
-            await batch.commit();
-            response.status(201).send({ data: { message: `Batch processed. ${questions.length} questions attempted.` } });
-
-        } catch (error) {
-            console.error("Error batch saving questions to Firestore:", error);
-            response.status(500).send({ error: { message: "Internal server error while batch saving questions.", status: "INTERNAL" } });
+            const newDocRef = questionBankRef.doc(); // auto-generate ID
+            const newQuestionData = {
+                ...q,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdBy: 'admin-batch',
+                authorUid: context.auth.uid
+            };
+            batch.set(newDocRef, newQuestionData);
         }
-    });
+
+        await batch.commit();
+        return { message: `Batch processed. ${questions.length} questions attempted.` };
+
+    } catch (error) {
+        console.error("Error batch saving questions to Firestore:", error);
+        throw new functions.https.HttpsError("internal", "Internal server error while batch saving questions.");
+    }
 });
+
+
+export const setAdmin = functions.https.onCall(async (data, context) => {
+    // Check if the user is an admin
+    if (context.auth?.token.admin !== true) {
+        throw new functions.https.HttpsError(
+            "permission-denied",
+            "Only admins can add other admins."
+        );
+    }
+
+    const email = data.email;
+    try {
+        const user = await admin.auth().getUserByEmail(email);
+        await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+        return { message: `Success! ${email} has been made an admin.` };
+    } catch (error) {
+        console.error("Error setting admin claim:", error);
+        throw new functions.https.HttpsError("internal", "Error setting admin claim.");
+    }
+});
+

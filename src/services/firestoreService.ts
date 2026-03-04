@@ -10,7 +10,6 @@ import {
   serverTimestamp,
   deleteDoc,
   Timestamp,
-  limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Exam, Question } from "../types/exam";

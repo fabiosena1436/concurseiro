@@ -32,7 +32,7 @@ interface ManualQuestionPayload {
 }
 
 const AdminPage: React.FC = () => {
-  const [mode, setMode] = useState<'single' | 'batch'>('single');
+  const [mode, setMode] = useState<'single' | 'batch' | 'user'>('single');
   
   // State for single question form
   const [subject, setSubject] = useState('');
@@ -46,12 +46,15 @@ const AdminPage: React.FC = () => {
 
   // State for batch form
   const [jsonContent, setJsonContent] = useState('');
+  
+  // State for admin management
+  const [email, setEmail] = useState('');
 
   // Common state
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleModeChange = (event: React.SyntheticEvent, newMode: 'single' | 'batch') => {
+  const handleModeChange = (event: React.SyntheticEvent, newMode: 'single' | 'batch' | 'user') => {
     setMode(newMode);
     setFeedback(null);
   };
@@ -118,15 +121,13 @@ const AdminPage: React.FC = () => {
     
     setIsSubmitting(true);
     try {
-        const parsedData = JSON.parse(jsonContent) as ManualQuestionPayload[];
+        const parsedData = JSON.parse(jsonContent);
         
         if (!Array.isArray(parsedData) || parsedData.length === 0) {
             throw new Error("O JSON deve ser um array de questões e não pode estar vazio.");
         }
 
-        // You can add more detailed validation for each object here if needed
-
-        const result = await adminService.addQuestionsBatch(parsedData);
+        const result = await adminService.addQuestionsBatch({questions: parsedData});
         setFeedback({ type: 'success', message: result.data.message });
         setJsonContent('');
     } catch (error) {
@@ -137,6 +138,30 @@ const AdminPage: React.FC = () => {
         setIsSubmitting(false);
     }
   }
+
+  const handleSetAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeedback(null);
+    setIsSubmitting(true);
+
+    if (!email) {
+      setFeedback({ type: 'error', message: 'O e-mail é obrigatório.' });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const result = await adminService.setAdminUser({email});
+      setFeedback({ type: 'success', message: result.data.message });
+      setEmail('');
+    } catch (error) {
+      console.error("Error setting admin:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+      setFeedback({ type: 'error', message: `Falha ao definir admin: ${errorMessage}` });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const jsonPlaceholder = `[
   {
@@ -156,19 +181,20 @@ const AdminPage: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Painel do Administrador
       </Typography>
-      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Gerenciamento do Banco de Questões
-      </Typography>
-
+      
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={mode} onChange={handleModeChange} aria-label="Modos de adição">
-          <Tab label="Adicionar Uma" value="single" />
+        <Tabs value={mode} onChange={handleModeChange} aria-label="Modos de administração">
+          <Tab label="Adicionar Questão" value="single" />
           <Tab label="Adicionar em Lote" value="batch" />
+          <Tab label="Gerenciar Admins" value="user" />
         </Tabs>
       </Box>
 
       {mode === 'single' && (
-        <Box component="form" onSubmit={handleSingleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box component="form" onSubmit={(e) => void handleSingleSubmit(e)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+              Adicionar uma única questão ao banco de dados.
+            </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { sm: '1fr 1fr' }, gap: 2 }}>
                 <TextField id="subject" label="Matéria" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Ex: Direito Constitucional" required />
                 <TextField id="topic" label="Tópico" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Ex: Art. 5º" required />
@@ -219,8 +245,8 @@ const AdminPage: React.FC = () => {
       )}
 
       {mode === 'batch' && (
-        <Box component="form" onSubmit={handleBatchSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="body1" gutterBottom>
+        <Box component="form" onSubmit={(e) => void handleBatchSubmit(e)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
                 Cole o array de questões em formato JSON abaixo. Use o mesmo formato esperado pela adição manual.
             </Typography>
             <TextField
@@ -242,8 +268,31 @@ const AdminPage: React.FC = () => {
             </Button>
         </Box>
       )}
+
+      {mode === 'user' && (
+        <Box component="form" onSubmit={(e) => void handleSetAdminSubmit(e)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                Digite o e-mail do usuário que você deseja tornar um administrador. O usuário precisará sair e fazer login novamente para que a alteração tenha efeito.
+            </Typography>
+            <TextField
+                id="email"
+                label="E-mail do Usuário"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+            />
+
+            {feedback && <Alert severity={feedback.type}>{feedback.message}</Alert>}
+
+            <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ mt: 2, py: 1.5 }}>
+                {isSubmitting ? <CircularProgress size={24} /> : 'Tornar Administrador'}
+            </Button>
+        </Box>
+      )}
     </Container>
   );
 };
 
 export default AdminPage;
+
