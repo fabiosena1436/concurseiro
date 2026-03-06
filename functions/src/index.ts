@@ -12,7 +12,8 @@ const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4o-mini"});
 // 2. CONFIGURAÇÃO DO CORS
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
 const whitelist = [
-  'http://localhost:5173', 
+  'http://localhost:5173',
+  'http://127.0.0.1:5173', // Adicionado para cobrir o acesso via IP local
   'https://concurseiro-three.vercel.app',
   'https://concurseiro-beryl.vercel.app'
 ];
