@@ -24,6 +24,8 @@ const bancas = [
     "Fundação Getúlio Vargas (FGV)",
     "Fundação Cesgranrio",
     "Fundação Carlos Chagas (FCC)",
+    "Vunesp",
+    "KLC",
     "Outra"
 ];
 
@@ -40,13 +42,14 @@ export const ExamCreator: React.FC = () => {
   const navigate = useNavigate();
   const [subject, setSubject] = useState<string>(subjects[0]);
   const [customSubject, setCustomSubject] = useState('');
+  const [specificContent, setSpecificContent] = useState(''); // Estado para conteúdo específico
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
   const [numQuestions, setNumQuestions] = useState(10);
-  const [difficulty, setDifficulty] = useState<'medio' | 'superior'>('medio');
+  const [difficulty, setDifficulty] = useState<'fundamental' | 'medio' | 'superior'>('medio');
   const [useEditalContent, setUseEditalContent] = useState(false);
   const [editalContent, setEditalContent] = useState('');
-  const [editalTitle, setEditalTitle] = useState(''); // 1. ESTADO PARA TÍTULO DO EDITAL
+  const [editalTitle, setEditalTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +62,6 @@ export const ExamCreator: React.FC = () => {
       return;
     }
 
-    // 4. VALIDAÇÃO ATUALIZADA
     if (useEditalContent) {
       if (!editalTitle.trim()) {
         setError("Por favor, dê um nome ao seu simulado a partir do edital.");
@@ -87,7 +89,6 @@ export const ExamCreator: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // O 'subject' enviado para a IA quando se usa edital é um resumo ou o título.
       const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
       
       const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
@@ -100,6 +101,7 @@ export const ExamCreator: React.FC = () => {
         bancaApi,
         difficulty,
         editalContent: useEditalContent ? editalContent : undefined,
+        specificContent: !useEditalContent ? specificContent : undefined,
         existingQuestions,
       });
 
@@ -109,7 +111,8 @@ export const ExamCreator: React.FC = () => {
         bancaApi,
         difficulty, 
         useEditalContent ? editalContent : undefined,
-        existingQuestions
+        existingQuestions,
+        !useEditalContent ? specificContent : undefined
       );
 
       console.log("Resposta da API:", questionsToUse);
@@ -124,7 +127,6 @@ export const ExamCreator: React.FC = () => {
       const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts];
       localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
       
-      // 3. LÓGICA DE GERAÇÃO DE TÍTULO ATUALIZADA
       const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
 
       const examData = {
@@ -159,7 +161,6 @@ export const ExamCreator: React.FC = () => {
 
         {useEditalContent ? (
           <>
-            {/* 2. NOVO CAMPO DE TEXTO CONDICIONAL */}
             <TextField
               fullWidth
               margin="normal"
@@ -210,6 +211,16 @@ export const ExamCreator: React.FC = () => {
                 required={subject === 'Outra'}
               />
             )}
+            
+            <TextField
+              fullWidth
+              margin="normal"
+              id="specificContent"
+              label="Conteúdo Específico (Opcional)"
+              value={specificContent}
+              onChange={(e) => setSpecificContent(e.target.value)}
+              placeholder="Ex: Linux, Crase, Juros Simples"
+            />
           </>
         )}
 
@@ -246,8 +257,9 @@ export const ExamCreator: React.FC = () => {
             id="difficulty"
             value={difficulty}
             label="Nível de Dificuldade"
-            onChange={(e) => setDifficulty(e.target.value as 'medio' | 'superior')}
+            onChange={(e) => setDifficulty(e.target.value as 'fundamental' | 'medio' | 'superior')}
           >
+            <MenuItem value="fundamental">Nível Fundamental</MenuItem>
             <MenuItem value="medio">Nível Médio</MenuItem>
             <MenuItem value="superior">Nível Superior</MenuItem>
           </Select>

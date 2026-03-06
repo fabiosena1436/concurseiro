@@ -13,7 +13,8 @@ const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4o-mini"});
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
 const whitelist = [
   'http://localhost:5173', 
-  'https://concurseiro-three.vercel.app'
+  'https://concurseiro-three.vercel.app',
+  'https://concurseiro-beryl.vercel.app'
 ];
 
 const corsOptions = {
@@ -35,6 +36,8 @@ const bancaProfiles = {
   "Fundação Getúlio Vargas (FGV)": "Conhecida por questões longas, com textos e cenários complexos que exigem interpretação e raciocínio lógico. As alternativas são muitas vezes bem elaboradas para induzir ao erro.",
   "Fundação Cesgranrio": "Estilo mais direto e objetivo, com questões que cobram o conhecimento literal da lei ou do conteúdo. Menos interpretativa que a FGV ou o Cespe.",
   "Fundação Carlos Chagas (FCC)": "Alternativas geralmente longas e muito parecidas entre si, exigindo que o candidato conheça o 'decoreba' e a literalidade da lei. A jurisprudência também é cobrada com frequência.",
+  "Vunesp": "Conhecida por enunciados diretos e cobrança literal da lei ('lei seca'). As questões frequentemente incluem 'pegadinhas' e detalhes específicos como prazos e exceções. O nível de dificuldade é considerado moderado, mas exige atenção.",
+  "KLC": "Estilo de prova com questões objetivas, diretas e bem estruturadas. Foco em testar conhecimentos específicos e habilidades dos candidatos, com padrões de prova mais previsíveis.",
   "Outra": "Estilo genérico de múltipla escolha (A, B, C, D), focado na precisão do conteúdo e clareza.",
 };
 
@@ -51,12 +54,16 @@ const createPrompt = (data: {
   banca: keyof typeof bancaProfiles;
   difficulty: string;
   editalContent?: string;
+  specificContent?: string; // NOVO CAMPO
   existingQuestions?: { question: string }[];
 }) => {
-  const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions } = data;
+  const { subject, numQuestions, banca, difficulty, editalContent, specificContent, existingQuestions } = data;
   const bancaStyle = bancaProfiles[banca] || bancaProfiles["Outra"];
   const context = getRelevantContext(editalContent || "");
   const hasEdital = !!editalContent && editalContent.trim() !== '' && context !== "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
+
+  // Tópico principal refinado com o conteúdo específico
+  const topic = specificContent ? `${subject} (foco específico em: ${specificContent})` : subject;
 
   // Define o formato da questão e o número de opções
   const isCespe = banca === "Cespe/Cebraspe";
@@ -82,13 +89,21 @@ const createPrompt = (data: {
     ---
     `
     : "";
+    
+  // Mapeamento de dificuldade para texto
+  const difficultyMap = {
+    'fundamental': 'Ensino Fundamental',
+    'medio': 'Ensino Médio',
+    'superior': 'Ensino Superior'
+  };
+  const difficultyText = difficultyMap[difficulty as keyof typeof difficultyMap] || "Nível não especificado";
 
   return `
     **Você é um Especialista em Concursos Públicos criando questões para a banca "${banca}".**
-    **Missão:** Gerar ${numQuestions} questões **NOVAS E DISTINTAS** de altíssima qualidade sobre o **Tópico Principal: "${subject}"**.
+    **Missão:** Gerar ${numQuestions} questões **NOVAS E DISTINTAS** de altíssima qualidade sobre o **Tópico Principal: "${topic}"**.
 
     **ETAPA 1: REGRAS GERAIS**
-    - **Nível de Dificuldade:** ${difficulty === "medio" ? "Ensino Médio" : "Ensino Superior"}.
+    - **Nível de Dificuldade:** ${difficultyText}.
     - **Estilo da Banca (${banca}):** ${bancaStyle}.
     - ${sourceOfTruth}
     - **Formato da Questão:** ${questionFormat}.
@@ -143,7 +158,7 @@ export const generateQuestions = functions.https.onRequest((request, response) =
     
     const openai = new OpenAI({ apiKey });
     const data = request.body.data;
-    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions } = data;
+    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data; // specificContent adicionado
 
     if (!subject || !numQuestions || !banca || !difficulty) {
       response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
@@ -151,7 +166,7 @@ export const generateQuestions = functions.https.onRequest((request, response) =
     }
 
     try {
-      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, existingQuestions });
+      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, specificContent, existingQuestions }); // specificContent passado
       const completion = await openai.chat.completions.create({
         model: model,
         messages: [

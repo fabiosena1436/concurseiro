@@ -7,9 +7,10 @@ export const generateQuestionsFromBank = async (
   subject: string,
   numQuestions: number,
   banca: string,
-  difficulty: 'medio' | 'superior',
+  difficulty: 'fundamental' | 'medio' | 'superior',
   editalContent?: string,
-  existingQuestions?: Question[]
+  existingQuestions?: Question[],
+  specificContent?: string
 ): Promise<Question[]> => {
   try {
     const user = auth.currentUser;
@@ -33,6 +34,7 @@ export const generateQuestionsFromBank = async (
           difficulty,
           editalContent,
           existingQuestions,
+          specificContent,
         }
       }),
     });
@@ -47,11 +49,12 @@ export const generateQuestionsFromBank = async (
       throw new Error(errorPayload.message || 'Falha ao buscar dados.');
     }
 
-    // The raw HTTP response from a callable function wraps the payload in a 'result' key.
-    const questions = result.result as Question[];
+    // The raw HTTP response from a callable function wraps the payload in a 'data' key for success.
+    const questions = result.data as Question[];
+
 
     if (!Array.isArray(questions)) {
-        console.error("A API não retornou um array de questões no campo 'result'. Resposta recebida:", result);
+        console.error("A API não retornou um array de questões no campo 'data'. Resposta recebida:", result);
         throw new Error("A resposta da API de geração de questões não teve o formato esperado.");
     }
     
