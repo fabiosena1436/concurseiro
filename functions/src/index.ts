@@ -104,6 +104,7 @@ const createPrompt = (data: {
     **Missão:** Gerar ${numQuestions} questões **NOVAS E DISTINTAS** de altíssima qualidade sobre o **Tópico Principal: "${topic}"**.
 
     **ETAPA 1: REGRAS GERAIS**
+    - **IDIOMA OBRIGATÓRIO:** Todo o conteúdo (enunciado, opções, explicação) deve ser gerado **estritamente em Português do Brasil**.
     - **Nível de Dificuldade:** ${difficultyText}.
     - **Estilo da Banca (${banca}):** ${bancaStyle}.
     - ${sourceOfTruth}
@@ -116,9 +117,10 @@ const createPrompt = (data: {
 
     **ETAPA 2: REGRAS DE GERAÇÃO E FORMATAÇÃO**
     ${generationRules}
-    2. **EVITAR REPETIÇÃO:** É **PROIBIDO** criar questões que sejam semanticamente similares às listadas na seção "QUESTÕES EXISTENTES".
-    3. **PROIBIDO META-QUESTÕES:** Não crie questões sobre "o contexto fornecido" ou a falta de informações. Foque apenas no **Tópico Principal**.
-    4. **ESTRUTURA JSON OBRIGATÓRIA:** A saída final **DEVE** ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos. Não inclua texto ou comentários fora do JSON.
+    2. **QUANTIDADE EXATA:** O array "questions" na saída JSON final deve conter **exatamente** ${numQuestions} objetos de questão.
+    3. **EVITAR REPETIÇÃO:** É **PROIBIDO** criar questões que sejam semanticamente similares às listadas na seção "QUESTÕES EXISTENTES".
+    4. **PROIBIDO META-QUESTÕES:** Não crie questões sobre "o contexto fornecido" ou a falta de informações. Foque apenas no **Tópico Principal**.
+    5. **ESTRUTURA JSON OBRIGATÓRIA:** A saída final **DEVE** ser um único objeto JSON válido, contendo uma chave "questions", que é um array de objetos. Não inclua texto ou comentários fora do JSON.
     
     **ETAPA 3: ESTRUTURA DE CADA QUESTÃO NO JSON**
     Cada objeto no array "questions" deve ter a seguinte estrutura:
