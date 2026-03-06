@@ -1,9 +1,9 @@
 
-import * as functions from "firebase-functions";
+import {onRequest} from "firebase-functions/v2/https";
+import {defineString} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
 import * as cors from "cors";
-import {defineString} from "firebase-functions/params";
 
 // 1. DEFINIÇÃO DE PARÂMETROS (A NOVA FORMA)
 const openAIKey = defineString("OPENAI_KEY");
@@ -131,7 +131,7 @@ const createPrompt = (data: {
   `;
 };
 
-export const generateQuestions = functions.https.onRequest((request, response) => {
+export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, response) => {
   corsHandler(request, response, async () => {
     const idToken = request.headers.authorization?.split("Bearer ")[1];
     if (!idToken) {
