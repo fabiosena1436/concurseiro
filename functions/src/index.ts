@@ -42,6 +42,12 @@ const bancaProfiles = {
   "Outra": "Estilo genérico de múltipla escolha (A, B, C, D), focado na precisão do conteúdo e clareza.",
 };
 
+const difficultyProfiles = {
+  'fundamental': "Questões de nível fundamental: Foco em conceitos básicos, definições diretas e conhecimento literal. As perguntas devem ser simples, claras e com vocabulário acessível.",
+  'medio': "Questões de nível médio: Exige compreensão de conceitos, capacidade de relacionar informações e aplicar conhecimento em cenários simples. Pode incluir 'pegadinhas' e exigir mais atenção aos detalhes do que o nível fundamental.",
+  'superior': "Questões de nível superior: Exige raciocínio complexo, análise crítica, interpretação de cenários abstratos e conhecimento aprofundado e específico da matéria. As alternativas devem ser sutis, bem elaboradas e plausíveis, testando a profundidade do conhecimento do candidato e sua capacidade de discernimento."
+};
+
 const getRelevantContext = (content: string): string => {
   if (!content) {
     return "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
@@ -53,7 +59,7 @@ const createPrompt = (data: {
   subject: string;
   numQuestions: number;
   banca: keyof typeof bancaProfiles;
-  difficulty: string;
+  difficulty: keyof typeof difficultyProfiles;
   editalContent?: string;
   specificContent?: string; // NOVO CAMPO
   existingQuestions?: { question: string }[];
@@ -97,7 +103,8 @@ const createPrompt = (data: {
     'medio': 'Ensino Médio',
     'superior': 'Ensino Superior'
   };
-  const difficultyText = difficultyMap[difficulty as keyof typeof difficultyMap] || "Nível não especificado";
+  const difficultyText = difficultyMap[difficulty] || "Nível não especificado";
+  const difficultyDescription = difficultyProfiles[difficulty] || "Nível não especificado.";
 
   return `
     **Você é um Especialista em Concursos Públicos criando questões para a banca "${banca}".**
@@ -106,6 +113,7 @@ const createPrompt = (data: {
     **ETAPA 1: REGRAS GERAIS**
     - **IDIOMA OBRIGATÓRIO:** Todo o conteúdo (enunciado, opções, explicação) deve ser gerado **estritamente em Português do Brasil**.
     - **Nível de Dificuldade:** ${difficultyText}.
+    - **Detalhamento da Dificuldade:** ${difficultyDescription}.
     - **Estilo da Banca (${banca}):** ${bancaStyle}.
     - ${sourceOfTruth}
     - **Formato da Questão:** ${questionFormat}.
