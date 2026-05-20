@@ -1,13 +1,13 @@
-
 import {onRequest} from "firebase-functions/v2/https";
 import {defineString} from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cors from "cors";
 
-// 1. DEFINIÇÃO DE PARÂMETROS (A NOVA FORMA)
-const openAIKey = defineString("OPENAI_KEY");
-const openAIModel = defineString("OPENAI_MODEL", {default: "gpt-4o-mini"});
+// 1. DEFINIÇÃO DE PARÂMETROS
+// Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)
+const geminiApiKey = defineString("GEMINI_API_KEY");
+const geminiModelStr = defineString("GEMINI_MODEL", {default: "gemini-2.5-flash"});
 
 // 2. CONFIGURAÇÃO DO CORS
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
@@ -158,18 +158,26 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     }
 
     // 3. USANDO OS PARÂMETROS EM TEMPO DE EXECUÇÃO
-    const apiKey = openAIKey.value();
-    const model = openAIModel.value();
+    const apiKey = geminiApiKey.value();
+    const modelStr = geminiModelStr.value();
 
     if (!apiKey) {
-      console.error("A chave da API da OpenAI não foi configurada. Execute 'firebase functions:config:set OPENAI_KEY=sua_chave'");
-      response.status(500).send({ error: { message: "A chave da API do OpenAI não está configurada no servidor. Contate o administrador.", status: "FAILED_PRECONDITION" } });
+      console.error("A chave da API do Gemini não foi configurada. Execute 'firebase functions:config:set GEMINI_API_KEY=sua_chave'");
+      response.status(500).send({ error: { message: "A chave da API da IA não está configurada no servidor.", status: "FAILED_PRECONDITION" } });
       return;
     }
     
-    const openai = new OpenAI({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: modelStr,
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+      systemInstruction: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
+    });
+
     const data = request.body.data;
-    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data; // specificContent adicionado
+    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data;
 
     if (!subject || !numQuestions || !banca || !difficulty) {
       response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
@@ -177,23 +185,11 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     }
 
     try {
-      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, specificContent, existingQuestions }); // specificContent passado
-      const completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        response_format: { type: "json_object" },
-      });
+      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, specificContent, existingQuestions });
+      
+      const result = await model.generateContent(prompt);
+      const responseContent = result.response.text();
 
-      const responseContent = completion.choices[0]?.message?.content;
       if (!responseContent) {
         response.status(500).send({ error: { message: "A resposta da IA está vazia ou nula.", status: "INTERNAL" } });
         return;
@@ -203,7 +199,7 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       try {
         responseObject = JSON.parse(responseContent);
       } catch (parseError) {
-        console.error("Error parsing JSON from OpenAI:", { response: responseContent, error: parseError });
+        console.error("Error parsing JSON from Gemini:", { response: responseContent, error: parseError });
         response.status(500).send({ error: { message: "A resposta da IA não é um JSON válido.", status: "INTERNAL", details: { originalResponse: responseContent } } });
         return;
       }
@@ -223,12 +219,29 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       response.status(200).send({ data: allQuestions });
 
     } catch (error: any) {
-      console.error("Error calling OpenAI API or processing data:", {
+      console.error("Error calling Gemini API or processing data:", {
         errorMessage: error.message,
-        errorCode: error.code,
         requestData: data,
       });
-      response.status(500).send({ error: { message: "Ocorreu um erro interno ao chamar a API da IA.", status: "INTERNAL", details: { originalError: error.message } } });
+
+      let friendlyMessage = "Ocorreu um erro interno ao chamar a API da IA.";
+      let statusString = "INTERNAL";
+      let httpStatus = 500;
+
+      if (error.message) {
+        const msgLower = error.message.toLowerCase();
+        if (msgLower.includes("503") || msgLower.includes("high demand") || msgLower.includes("overloaded")) {
+          friendlyMessage = "A inteligência artificial está com alta demanda no momento. Por favor, aguarde alguns segundos e tente novamente.";
+          statusString = "UNAVAILABLE";
+          httpStatus = 503;
+        } else if (msgLower.includes("429") || msgLower.includes("quota") || msgLower.includes("too many requests")) {
+          friendlyMessage = "O limite de uso gratuito da API foi atingido. Por favor, tente novamente em alguns minutos.";
+          statusString = "RESOURCE_EXHAUSTED";
+          httpStatus = 429;
+        }
+      }
+
+      response.status(httpStatus).send({ error: { message: friendlyMessage, status: statusString, details: { originalError: error.message } } });
     }
   });
 });

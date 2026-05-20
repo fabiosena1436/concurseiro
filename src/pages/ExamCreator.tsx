@@ -265,16 +265,19 @@ export const ExamCreator: React.FC = () => {
           </Select>
         </FormControl>
 
-        <TextField
-          fullWidth
-          margin="normal"
-          id="numQuestions"
-          label="Número de Questões"
-          type="number"
-          value={numQuestions}
-          onChange={(e) => setNumQuestions(Math.max(1, parseInt(e.target.value, 10)))}
-          InputProps={{ inputProps: { min: 1, max: 20 } }}
-        />
+        <FormControl fullWidth margin="normal">
+          <InputLabel id="numQuestions-label">Número de Questões</InputLabel>
+          <Select
+            labelId="numQuestions-label"
+            id="numQuestions"
+            value={numQuestions}
+            label="Número de Questões"
+            onChange={(e) => setNumQuestions(Number(e.target.value))}
+          >
+            <MenuItem value={5}>5 Questões </MenuItem>
+            <MenuItem value={10}>10 Questões </MenuItem>
+          </Select>
+        </FormControl>
         
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
