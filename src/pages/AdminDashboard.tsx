@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField } from '@mui/material';
-import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage } from '../services/firestoreService';
+import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin } from '../services/firestoreService';
 import { deleteUserAccount } from '../services/adminService';
 import type { UserProfile } from '../types/user';
 import type { SupportMessage } from '../types/message';
@@ -22,6 +22,15 @@ export const AdminDashboard: React.FC = () => {
       ]);
       setUsers(fetchedUsers);
       setMessages(fetchedMessages);
+      
+      // Marca mensagens como lidas pelo admin se a aba de mensagens estiver aberta
+      if (tabIndex === 1) {
+        fetchedMessages.forEach(msg => {
+          if (!msg.isReadByAdmin && msg.id) {
+            void markMessageAsReadByAdmin(msg.id);
+          }
+        });
+      }
     } catch (err) {
       console.error(err);
       setError("Erro ao carregar dados.");
@@ -32,7 +41,7 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     void fetchData();
-  }, []);
+  }, [tabIndex]); // Re-fetch or mark read when tab changes
 
   const handleToggleUnlock = async (uid: string, currentStatus: boolean) => {
     try {

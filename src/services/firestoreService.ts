@@ -93,6 +93,16 @@ export const markMessageAsReadByUser = async (messageId: string): Promise<void> 
 };
 
 /**
+ * Marca uma mensagem como lida pelo Admin.
+ */
+export const markMessageAsReadByAdmin = async (messageId: string): Promise<void> => {
+  const msgRef = doc(db, "messages", messageId);
+  await updateDoc(msgRef, {
+    isReadByAdmin: true
+  });
+};
+
+/**
  * Busca todos os usuários do sistema (Para o painel Admin).
  */
 export const getAllUsers = async (): Promise<UserProfile[]> => {

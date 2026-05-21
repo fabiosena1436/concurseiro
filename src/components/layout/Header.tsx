@@ -1,29 +1,15 @@
-import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, IconButton, Drawer, List, ListItem, ListItemText, ListItemButton } from '@mui/material';
-import React,
-{
-  useState
-} from 'react';
-import {
-  Link,
-  useNavigate
-} from 'react-router-dom';
-import {
-  useAuth
-} from '../../hooks/useAuth';
-import {
-  auth
-} from '../../services/firebase';
+import { AppBar, Toolbar, Typography, Button, Box, useMediaQuery, IconButton, Drawer, List, ListItem, ListItemText, ListItemButton, Badge } from '@mui/material';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
+import { auth } from '../../services/firebase';
 import MenuIcon from '@mui/icons-material/Menu';
-import {
-  useTheme
-} from '@mui/material/styles';
-
+import { useTheme } from '@mui/material/styles';
 
 export const Header: React.FC = () => {
-  const {
-    user,
-    userData
-  } = useAuth();
+  const { user, userData } = useAuth();
+  const { unreadCount, adminUnreadCount } = useUnreadMessages();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -52,11 +38,19 @@ export const Header: React.FC = () => {
             <ListItemText primary="Dashboard" />
           </ListItemButton>
           <ListItemButton component={Link} to="/suporte" onClick={handleDrawerToggle}>
-            <ListItemText primary="Suporte" />
+            <ListItemText primary={
+              <Badge badgeContent={unreadCount} color="error" sx={{ '& .MuiBadge-badge': { right: -15, top: 10 } }}>
+                Suporte
+              </Badge>
+            } />
           </ListItemButton>
           {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
             <ListItemButton component={Link} to="/admin" onClick={handleDrawerToggle}>
-              <ListItemText primary="Painel Admin" />
+              <ListItemText primary={
+                <Badge badgeContent={adminUnreadCount} color="error" sx={{ '& .MuiBadge-badge': { right: -15, top: 10 } }}>
+                  Painel Admin
+                </Badge>
+              } />
             </ListItemButton>
           )}
         </>
@@ -130,11 +124,15 @@ export const Header: React.FC = () => {
                   Dashboard
                 </Button>
                 <Button color="inherit" component={Link} to="/suporte">
-                  Suporte
+                  <Badge badgeContent={unreadCount} color="error">
+                    Suporte
+                  </Badge>
                 </Button>
                 {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
                   <Button color="inherit" component={Link} to="/admin">
-                    Admin
+                    <Badge badgeContent={adminUnreadCount} color="error">
+                      Admin
+                    </Badge>
                   </Button>
                 )}
               </>
