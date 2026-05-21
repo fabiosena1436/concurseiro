@@ -68,14 +68,14 @@ export const generateQuestionsFromBank = async (
     // O erro pode ser da rede (fetch falhou) ou o que lançamos acima
     console.error("Falha na operação de generateQuestionsFromBank:", error);
 
-    let errorMessage = `Ocorreu um erro ao gerar as questões com a IA. Detalhe: ${error.message}`;
+    let errorMessage = error.message || "Ocorreu um erro desconhecido ao gerar as questões.";
 
     const fallbackQuestion: Question = {
       id: 'error-0',
       question: errorMessage,
       options: ['Tente novamente', 'Verifique os parâmetros', 'Tente mais tarde', 'Contate o suporte'],
       correctAnswer: 0,
-      explanation: `A chamada para a API falhou. Causa: ${error.message || 'Erro desconhecido.'}. Verifique o console do navegador (aba 'Rede' e 'Console') e os logs da Cloud Function para mais detalhes.`,
+      explanation: `A chamada para a API falhou. Causa: ${errorMessage}. Verifique o console do navegador (aba 'Rede' e 'Console') e os logs da Cloud Function para mais detalhes.`,
       subject: subject,
     };
     return [fallbackQuestion];

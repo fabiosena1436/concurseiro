@@ -43,6 +43,8 @@ export const Signup: React.FC = () => {
                     socialName,
                     phone,
                     email: firebaseUser.email,
+                    generationCount: 0,
+                    isUnlocked: false,
                 });
             }
             navigate('/dashboard');

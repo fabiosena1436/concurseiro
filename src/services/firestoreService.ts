@@ -10,13 +10,105 @@ import {
   serverTimestamp,
   deleteDoc,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Exam } from "../types/exam";
 import type { Result } from "../types/result";
+import type { UserProfile } from "../types/user";
+import type { SupportMessage } from "../types/message";
 
 const examsCollection = collection(db, "exams");
 const resultsCollection = collection(db, "results");
+const usersCollection = collection(db, "users");
+const messagesCollection = collection(db, "messages");
+
+/**
+ * Envia uma nova mensagem de suporte.
+ */
+export const sendSupportMessage = async (message: Omit<SupportMessage, "id" | "createdAt" | "isReadByAdmin" | "isReadByUser">): Promise<void> => {
+  await addDoc(messagesCollection, {
+    ...message,
+    createdAt: serverTimestamp(),
+    isReadByAdmin: false,
+    isReadByUser: true,
+  });
+};
+
+/**
+ * Responde uma mensagem de suporte (Admin).
+ */
+export const replySupportMessage = async (messageId: string, replyText: string): Promise<void> => {
+  const msgRef = doc(db, "messages", messageId);
+  await updateDoc(msgRef, {
+    reply: replyText,
+    repliedAt: serverTimestamp(),
+    isReadByAdmin: true,
+    isReadByUser: false,
+  });
+};
+
+/**
+ * Busca as mensagens de um usuário.
+ */
+export const getUserMessages = async (userId: string): Promise<SupportMessage[]> => {
+  const q = query(messagesCollection, where("userId", "==", userId), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+      repliedAt: data.repliedAt ? (data.repliedAt as Timestamp).toDate() : undefined,
+    } as SupportMessage;
+  });
+};
+
+/**
+ * Busca todas as mensagens (Para o Admin).
+ */
+export const getAllMessages = async (): Promise<SupportMessage[]> => {
+  const q = query(messagesCollection, orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt ? (data.createdAt as Timestamp).toDate() : new Date(),
+      repliedAt: data.repliedAt ? (data.repliedAt as Timestamp).toDate() : undefined,
+    } as SupportMessage;
+  });
+};
+
+/**
+ * Marca uma mensagem como lida pelo usuário.
+ */
+export const markMessageAsReadByUser = async (messageId: string): Promise<void> => {
+  const msgRef = doc(db, "messages", messageId);
+  await updateDoc(msgRef, {
+    isReadByUser: true
+  });
+};
+
+/**
+ * Busca todos os usuários do sistema (Para o painel Admin).
+ */
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  const querySnapshot = await getDocs(usersCollection);
+  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
+};
+
+/**
+ * Atualiza o status de desbloqueio de um usuário.
+ */
+export const toggleUserUnlockStatus = async (uid: string, isUnlocked: boolean): Promise<void> => {
+  const userDocRef = doc(db, "users", uid);
+  await updateDoc(userDocRef, {
+    isUnlocked: isUnlocked
+  });
+};
 
 /**
  * Cria um novo simulado no Firestore.

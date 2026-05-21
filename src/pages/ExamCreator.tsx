@@ -45,7 +45,7 @@ export const ExamCreator: React.FC = () => {
   const [specificContent, setSpecificContent] = useState(''); // Estado para conteúdo específico
   const [banca, setBanca] = useState<string>(bancas[0]);
   const [customBanca, setCustomBanca] = useState('');
-  const [numQuestions, setNumQuestions] = useState(10);
+  const numQuestions = 10; // Fixo em 10 questões
   const [difficulty, setDifficulty] = useState<'fundamental' | 'medio' | 'superior'>('medio');
   const [useEditalContent, setUseEditalContent] = useState(false);
   const [editalContent, setEditalContent] = useState('');
@@ -262,20 +262,6 @@ export const ExamCreator: React.FC = () => {
             <MenuItem value="fundamental">Nível Fundamental</MenuItem>
             <MenuItem value="medio">Nível Médio</MenuItem>
             <MenuItem value="superior">Nível Superior</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl fullWidth margin="normal">
-          <InputLabel id="numQuestions-label">Número de Questões</InputLabel>
-          <Select
-            labelId="numQuestions-label"
-            id="numQuestions"
-            value={numQuestions}
-            label="Número de Questões"
-            onChange={(e) => setNumQuestions(Number(e.target.value))}
-          >
-            <MenuItem value={5}>5 Questões </MenuItem>
-            <MenuItem value={10}>10 Questões </MenuItem>
           </Select>
         </FormControl>
         

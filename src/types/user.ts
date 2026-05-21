@@ -4,5 +4,7 @@ export interface UserProfile {
   name: string | null;
   socialName: string | null;
   phone: string | null;
-  // Adicione outros campos de perfil que você queira salvar, como histórico de simulados, etc.
+  generationCount?: number;
+  isUnlocked?: boolean;
+  isAdmin?: boolean;
 }

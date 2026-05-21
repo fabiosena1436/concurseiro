@@ -149,12 +149,32 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       return;
     }
 
+    let decodedToken;
     try {
-      await admin.auth().verifyIdToken(idToken);
+      decodedToken = await admin.auth().verifyIdToken(idToken);
     } catch (error) {
       console.error("Error verifying ID token:", error);
       response.status(401).send({ error: { message: "Unauthorized. Invalid token.", status: "UNAUTHENTICATED" } });
       return;
+    }
+
+    const uid = decodedToken.uid;
+    const userDocRef = admin.firestore().collection("users").doc(uid);
+    
+    try {
+      const userDoc = await userDocRef.get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        const generationCount = userData?.generationCount || 0;
+        const isUnlocked = userData?.isUnlocked || false;
+        
+        if (!isUnlocked && generationCount >= 3) {
+          response.status(403).send({ error: { message: "Você atingiu o limite de 3 simulados gerados. Para continuar testando ou ter acesso ilimitado, entre em contato via e-mail e realize o pagamento de R$30,00 para desbloqueio da sua conta.", status: "PERMISSION_DENIED", isLimitReached: true } });
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
     }
 
     // 3. USANDO OS PARÂMETROS EM TEMPO DE EXECUÇÃO
@@ -216,6 +236,13 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
         subject: subject,
       }));
 
+      // Incrementa a contagem do usuário após sucesso
+      try {
+        await userDocRef.set({ generationCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
+      } catch (error) {
+        console.error("Error incrementing generationCount:", error);
+      }
+
       response.status(200).send({ data: allQuestions });
 
     } catch (error: any) {
@@ -245,3 +272,52 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     }
   });
 });
+
+export const deleteUserByAdmin = onRequest({timeoutSeconds: 60}, (request, response) => {
+  corsHandler(request, response, async () => {
+    if (request.method !== 'POST') {
+      response.status(405).send({ error: { message: "Method Not Allowed" } });
+      return;
+    }
+
+    const idToken = request.headers.authorization?.split("Bearer ")[1];
+    if (!idToken) {
+      response.status(401).send({ error: { message: "Unauthorized. No token provided." } });
+      return;
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+      console.error("Error verifying ID token:", error);
+      response.status(401).send({ error: { message: "Unauthorized. Invalid token." } });
+      return;
+    }
+
+    // Verify admin
+    if (decodedToken.email !== 'fabiosena1436@gmail.com') {
+      response.status(403).send({ error: { message: "Forbidden. Admin access required." } });
+      return;
+    }
+
+    const { uidToDelete } = request.body.data || {};
+    if (!uidToDelete) {
+      response.status(400).send({ error: { message: "uidToDelete is required." } });
+      return;
+    }
+
+    try {
+      // Delete from Firebase Auth
+      await admin.auth().deleteUser(uidToDelete);
+      // Delete from Firestore
+      await admin.firestore().collection("users").doc(uidToDelete).delete();
+      
+      response.status(200).send({ data: { success: true, message: "User deleted successfully." } });
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      response.status(500).send({ error: { message: "Failed to delete user.", details: error.message } });
+    }
+  });
+});
+

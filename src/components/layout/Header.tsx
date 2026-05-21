@@ -47,9 +47,19 @@ export const Header: React.FC = () => {
         <ListItemText primary="Sobre" />
       </ListItemButton>
       {user && (
-        <ListItemButton component={Link} to="/dashboard" onClick={handleDrawerToggle}>
-          <ListItemText primary="Dashboard" />
-        </ListItemButton>
+        <>
+          <ListItemButton component={Link} to="/dashboard" onClick={handleDrawerToggle}>
+            <ListItemText primary="Dashboard" />
+          </ListItemButton>
+          <ListItemButton component={Link} to="/suporte" onClick={handleDrawerToggle}>
+            <ListItemText primary="Suporte" />
+          </ListItemButton>
+          {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
+            <ListItemButton component={Link} to="/admin" onClick={handleDrawerToggle}>
+              <ListItemText primary="Painel Admin" />
+            </ListItemButton>
+          )}
+        </>
       )}
       <ListItemButton component={Link} to="/criar-simulado" onClick={handleDrawerToggle}>
         <ListItemText primary="Criar Simulado" />
@@ -115,9 +125,19 @@ export const Header: React.FC = () => {
               Sobre
             </Button>
             {user && (
-              <Button color="inherit" component={Link} to="/dashboard">
-                Dashboard
-              </Button>
+              <>
+                <Button color="inherit" component={Link} to="/dashboard">
+                  Dashboard
+                </Button>
+                <Button color="inherit" component={Link} to="/suporte">
+                  Suporte
+                </Button>
+                {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
+                  <Button color="inherit" component={Link} to="/admin">
+                    Admin
+                  </Button>
+                )}
+              </>
             )}
             <Button color="inherit" component={Link} to="/criar-simulado">
               Criar Simulado

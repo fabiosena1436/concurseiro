@@ -8,7 +8,10 @@ import { Results } from "../pages/Results";
 import { Login } from "../pages/Login";
 import { Signup } from "../pages/Signup";
 import { ProtectedRoute } from "../components/common/ProtectedRoute";
+import { AdminRoute } from "../components/common/AdminRoute";
 import { About } from "../pages/About";
+import { AdminDashboard } from "../pages/AdminDashboard";
+import { Support } from "../pages/Support";
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +53,19 @@ export const router = createBrowserRouter([
             path: "/resultados/:id",
             element: <Results />,
           },
+          {
+            path: "/suporte",
+            element: <Support />,
+          },
+        ]
+      },
+      {
+        element: <AdminRoute />,
+        children: [
+          {
+            path: "/admin",
+            element: <AdminDashboard />,
+          }
         ]
       }
     ],
