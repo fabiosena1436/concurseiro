@@ -52,9 +52,9 @@ export const replySupportMessage = async (messageId: string, replyText: string):
  * Busca as mensagens de um usuário.
  */
 export const getUserMessages = async (userId: string): Promise<SupportMessage[]> => {
-  const q = query(messagesCollection, where("userId", "==", userId), orderBy("createdAt", "desc"));
+  const q = query(messagesCollection, where("userId", "==", userId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
+  const msgs = snapshot.docs.map(doc => {
     const data = doc.data();
     return {
       id: doc.id,
@@ -63,15 +63,16 @@ export const getUserMessages = async (userId: string): Promise<SupportMessage[]>
       repliedAt: data.repliedAt ? (data.repliedAt as Timestamp).toDate() : undefined,
     } as SupportMessage;
   });
+  return msgs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 /**
  * Busca todas as mensagens (Para o Admin).
  */
 export const getAllMessages = async (): Promise<SupportMessage[]> => {
-  const q = query(messagesCollection, orderBy("createdAt", "desc"));
+  const q = query(messagesCollection);
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
+  const msgs = snapshot.docs.map(doc => {
     const data = doc.data();
     return {
       id: doc.id,
@@ -80,6 +81,7 @@ export const getAllMessages = async (): Promise<SupportMessage[]> => {
       repliedAt: data.repliedAt ? (data.repliedAt as Timestamp).toDate() : undefined,
     } as SupportMessage;
   });
+  return msgs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 /**
@@ -100,6 +102,14 @@ export const markMessageAsReadByAdmin = async (messageId: string): Promise<void>
   await updateDoc(msgRef, {
     isReadByAdmin: true
   });
+};
+
+/**
+ * Deleta uma mensagem de suporte.
+ */
+export const deleteSupportMessage = async (messageId: string): Promise<void> => {
+  const msgRef = doc(db, "messages", messageId);
+  await deleteDoc(msgRef);
 };
 
 /**

@@ -18,13 +18,15 @@ export const useUnreadMessages = () => {
     // Listener for regular user
     const userQuery = query(
       collection(db, 'messages'),
-      where('userId', '==', user.uid),
-      where('isReadByUser', '==', false),
-      where('reply', '!=', null)
+      where('userId', '==', user.uid)
     );
 
     const unsubscribeUser = onSnapshot(userQuery, (snapshot) => {
-      setUnreadCount(snapshot.docs.length);
+      const count = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.isReadByUser === false && data.reply;
+      }).length;
+      setUnreadCount(count);
     });
 
     let unsubscribeAdmin = () => {};

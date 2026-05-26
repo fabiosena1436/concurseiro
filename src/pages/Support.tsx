@@ -73,61 +73,57 @@ export const Support: React.FC = () => {
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Box component="form" onSubmit={handleSend} sx={{ mb: 4 }}>
-        <TextField
-          fullWidth
-          multiline
-          rows={3}
-          label="Sua mensagem"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          required
-          sx={{ mb: 2 }}
-        />
-        <Button type="submit" variant="contained" disabled={sending || !newMessage.trim()}>
-          {sending ? "Enviando..." : "Enviar Mensagem"}
-        </Button>
-      </Box>
-
       <Typography variant="h5" gutterBottom>
-        Histórico
+        Histórico de Conversa
       </Typography>
-      {messages.length === 0 ? (
-        <Typography color="text.secondary">Nenhuma mensagem encontrada.</Typography>
-      ) : (
-        messages.map((msg) => (
-          <Paper key={msg.id} sx={{ p: 2, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Enviado em: {msg.createdAt.toLocaleString()}
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-              Você:
-            </Typography>
-            <Typography variant="body1" paragraph>
-              {msg.text}
-            </Typography>
+      <Paper sx={{ p: 2, mb: 4, display: 'flex', flexDirection: 'column', bgcolor: '#f8f9fa' }}>
+        <Box sx={{ height: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
+          {messages.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ mt: 2 }}>Nenhuma mensagem encontrada. Envie sua primeira dúvida abaixo.</Typography>
+          ) : (
+            messages.slice().reverse().map((msg) => (
+              <React.Fragment key={msg.id}>
+                {/* User Message */}
+                <Box sx={{ alignSelf: 'flex-end', bgcolor: '#dcf8c6', p: 1.5, borderRadius: 2, maxWidth: '80%', ml: 'auto', boxShadow: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
+                    Você - {msg.createdAt.toLocaleString()}
+                  </Typography>
+                  <Typography variant="body1">
+                    {msg.text}
+                  </Typography>
+                </Box>
 
-            {msg.reply && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Respondido pelo Admin em: {msg.repliedAt?.toLocaleString()}
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                  Admin:
-                </Typography>
-                <Typography variant="body1">
-                  {msg.reply}
-                </Typography>
-              </Box>
-            )}
-            {!msg.reply && (
-              <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-                Aguardando resposta...
-              </Typography>
-            )}
-          </Paper>
-        ))
-      )}
+                {/* Admin Reply */}
+                {msg.reply && (
+                  <Box sx={{ alignSelf: 'flex-start', bgcolor: '#ffffff', p: 1.5, borderRadius: 2, maxWidth: '80%', mr: 'auto', boxShadow: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
+                      Admin - {msg.repliedAt?.toLocaleString() || ''}
+                    </Typography>
+                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {msg.reply}
+                    </Typography>
+                  </Box>
+                )}
+              </React.Fragment>
+            ))
+          )}
+        </Box>
+        
+        {/* Input box inside chat */}
+        <Box component="form" onSubmit={handleSend} sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Digite sua mensagem..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            required
+          />
+          <Button type="submit" variant="contained" disabled={sending || !newMessage.trim()}>
+            {sending ? "Enviando..." : "Enviar"}
+          </Button>
+        </Box>
+      </Paper>
     </Container>
   );
 };

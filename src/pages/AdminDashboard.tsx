@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField } from '@mui/material';
-import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin } from '../services/firestoreService';
+import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin, deleteSupportMessage } from '../services/firestoreService';
 import { deleteUserAccount } from '../services/adminService';
 import type { UserProfile } from '../types/user';
 import type { SupportMessage } from '../types/message';
@@ -12,6 +12,22 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  const [expandedThreads, setExpandedThreads] = useState<{ [key: string]: boolean }>({});
+  
+  // Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const handleCloseConfirm = () => setConfirmDialog(prev => ({ ...prev, open: false }));
 
   const fetchData = async () => {
     try {
@@ -49,34 +65,74 @@ export const AdminDashboard: React.FC = () => {
       setUsers(users.map(u => u.uid === uid ? { ...u, isUnlocked: !currentStatus } : u));
     } catch (err) {
       console.error(err);
-      alert("Erro ao alterar status.");
+      setError("Erro ao alterar status.");
     }
   };
 
-  const handleDeleteUser = async (uid: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir permanentemente este usuário?")) return;
-    try {
-      setLoading(true);
-      await deleteUserAccount(uid);
-      await fetchData();
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Erro ao deletar usuário.");
-      setLoading(false);
-    }
+  const handleDeleteUser = (uid: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Excluir Usuário',
+      message: 'Tem certeza que deseja excluir permanentemente este usuário? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        handleCloseConfirm();
+        try {
+          setLoading(true);
+          await deleteUserAccount(uid);
+          await fetchData();
+        } catch (err: any) {
+          console.error(err);
+          setError(err.message || "Erro ao deletar usuário.");
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const handleReply = async (messageId: string) => {
     const text = replyText[messageId];
     if (!text || !text.trim()) return;
     try {
-      await replySupportMessage(messageId, text);
+      const existingMessage = messages.find(m => m.id === messageId);
+      const newReply = existingMessage?.reply ? `${existingMessage.reply}\n\n[Nova resposta]: ${text}` : text;
+      
+      await replySupportMessage(messageId, newReply);
+      setReplyText(prev => ({ ...prev, [messageId]: '' }));
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert("Erro ao responder mensagem.");
+      setError("Erro ao responder mensagem.");
     }
   };
+
+  const handleDeleteConversation = (userId: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Apagar Conversa',
+      message: 'Tem certeza que deseja apagar toda a conversa com este usuário? O histórico será perdido.',
+      onConfirm: async () => {
+        handleCloseConfirm();
+        try {
+          setLoading(true);
+          const userMsgs = messages.filter(m => m.userId === userId);
+          await Promise.all(userMsgs.map(m => m.id ? deleteSupportMessage(m.id) : Promise.resolve()));
+          await fetchData();
+        } catch (err) {
+          console.error(err);
+          setError("Erro ao excluir conversa.");
+          setLoading(false);
+        }
+      }
+    });
+  };
+
+  const groupedMessages = Object.values(
+    messages.reduce((acc, msg) => {
+      if (!acc[msg.userId]) acc[msg.userId] = [];
+      acc[msg.userId].push(msg);
+      return acc;
+    }, {} as Record<string, SupportMessage[]>)
+  );
 
   if (loading) {
     return (
@@ -150,46 +206,115 @@ export const AdminDashboard: React.FC = () => {
 
       {tabIndex === 1 && (
         <Box>
-          {messages.length === 0 ? (
+          {groupedMessages.length === 0 ? (
             <Typography>Nenhuma mensagem.</Typography>
           ) : (
-            messages.map((msg) => (
-              <Paper key={msg.id} sx={{ p: 2, mb: 2, borderLeft: msg.reply ? '4px solid green' : '4px solid orange' }}>
-                <Typography variant="body2" color="text.secondary">
-                  De: {msg.userName} ({msg.userEmail}) em {msg.createdAt.toLocaleString()}
-                </Typography>
-                <Typography variant="body1" sx={{ mt: 1, mb: 2 }}>
-                  {msg.text}
-                </Typography>
-                
-                {msg.reply ? (
-                  <Box sx={{ bgcolor: 'action.hover', p: 1, borderRadius: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Sua Resposta:
-                    </Typography>
-                    <Typography variant="body1">
-                      {msg.reply}
-                    </Typography>
+            groupedMessages.map((thread) => {
+              const user = thread[0];
+              const chronologicalThread = [...thread].reverse();
+              const isExpanded = expandedThreads[user.userId] || false;
+              
+              const toggleThread = (userId: string) => {
+                setExpandedThreads(prev => ({ ...prev, [userId]: !prev[userId] }));
+              };
+
+              return (
+                <Paper key={user.userId} sx={{ mb: 4, bgcolor: '#f8f9fa', overflow: 'hidden' }}>
+                  <Box 
+                    sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', bgcolor: isExpanded ? '#e0e0e0' : 'transparent' }}
+                    onClick={() => toggleThread(user.userId)}
+                  >
+                    <Box>
+                      <Typography variant="h6">
+                        {user.userName} ({user.userEmail})
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Última mensagem: {user.createdAt.toLocaleDateString()} às {user.createdAt.toLocaleTimeString()}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Typography variant="button" color="primary">
+                        {isExpanded ? "Esconder" : "Abrir"}
+                      </Typography>
+                      <Button variant="outlined" color="error" size="small" onClick={(e) => { e.stopPropagation(); void handleDeleteConversation(user.userId); }}>
+                        Apagar
+                      </Button>
+                    </Box>
                   </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Escreva sua resposta..."
-                      value={replyText[msg.id!] || ''}
-                      onChange={(e) => setReplyText({ ...replyText, [msg.id!]: e.target.value })}
-                    />
-                    <Button variant="contained" onClick={() => void handleReply(msg.id!)}>
-                      Responder
-                    </Button>
-                  </Box>
-                )}
-              </Paper>
-            ))
+                  
+                  {isExpanded && (
+                    <Box sx={{ p: 2, pt: 0 }}>
+                      <Box sx={{ maxHeight: 400, overflowY: 'auto', p: 1, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: 1, mb: 2, mt: 2 }}>
+                        {chronologicalThread.map((msg) => (
+                          <React.Fragment key={msg.id}>
+                            {/* User Message */}
+                            <Box sx={{ alignSelf: 'flex-start', bgcolor: '#dcf8c6', p: 1.5, borderRadius: 2, maxWidth: '80%', boxShadow: 1 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
+                                {msg.createdAt.toLocaleString()}
+                              </Typography>
+                              <Typography variant="body1">
+                                {msg.text}
+                              </Typography>
+                            </Box>
+                            
+                            {/* Admin Reply */}
+                            {msg.reply && (
+                              <Box sx={{ alignSelf: 'flex-end', bgcolor: '#e3f2fd', p: 1.5, borderRadius: 2, maxWidth: '80%', ml: 'auto', boxShadow: 1 }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
+                                  {msg.repliedAt?.toLocaleString() || ''}
+                                </Typography>
+                                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                                  {msg.reply}
+                                </Typography>
+                              </Box>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </Box>
+                      
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="Enviar resposta..."
+                          value={replyText[user.userId] || ''}
+                          onChange={(e) => setReplyText({ ...replyText, [user.userId]: e.target.value })}
+                        />
+                        <Button variant="contained" onClick={() => {
+                          // Attach reply to the most recent message in the thread
+                          void handleReply(user.id!);
+                          setReplyText({ ...replyText, [user.userId]: '' });
+                        }}>
+                          Responder
+                        </Button>
+                      </Box>
+                    </Box>
+                  )}
+                </Paper>
+              );
+            })
           )}
         </Box>
       )}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={handleCloseConfirm}
+      >
+        <DialogTitle>{confirmDialog.title}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {confirmDialog.message}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirm} color="primary">
+            Cancelar
+          </Button>
+          <Button onClick={confirmDialog.onConfirm} color="error" variant="contained">
+            Confirmar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

@@ -98,6 +98,7 @@ export const Signup: React.FC = () => {
                     />
                     <TextField
                         margin="normal"
+                        required
                         fullWidth
                         id="socialName"
                         label="Nome Social"
@@ -108,6 +109,7 @@ export const Signup: React.FC = () => {
                     />
                     <TextField
                         margin="normal"
+                        required
                         fullWidth
                         id="phone"
                         label="Telefone"
