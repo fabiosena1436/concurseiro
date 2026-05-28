@@ -29,6 +29,7 @@ const messagesCollection = collection(db, "messages");
 export const sendSupportMessage = async (message: Omit<SupportMessage, "id" | "createdAt" | "isReadByAdmin" | "isReadByUser">): Promise<void> => {
   await addDoc(messagesCollection, {
     ...message,
+    sender: 'user',
     createdAt: serverTimestamp(),
     isReadByAdmin: false,
     isReadByUser: true,
@@ -38,11 +39,14 @@ export const sendSupportMessage = async (message: Omit<SupportMessage, "id" | "c
 /**
  * Responde uma mensagem de suporte (Admin).
  */
-export const replySupportMessage = async (messageId: string, replyText: string): Promise<void> => {
-  const msgRef = doc(db, "messages", messageId);
-  await updateDoc(msgRef, {
-    reply: replyText,
-    repliedAt: serverTimestamp(),
+export const replySupportMessage = async (userId: string, userEmail: string, userName: string, replyText: string): Promise<void> => {
+  await addDoc(messagesCollection, {
+    userId,
+    userEmail,
+    userName,
+    text: replyText,
+    sender: 'admin',
+    createdAt: serverTimestamp(),
     isReadByAdmin: true,
     isReadByUser: false,
   });

@@ -6,6 +6,7 @@ export interface SupportMessage {
   userEmail: string;
   userName: string;
   text: string;
+  sender?: 'user' | 'admin'; // Optional for legacy compatibility
   reply?: string;
   createdAt: Date;
   repliedAt?: Date;

@@ -1,9 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin, deleteSupportMessage } from '../services/firestoreService';
 import { deleteUserAccount } from '../services/adminService';
 import type { UserProfile } from '../types/user';
 import type { SupportMessage } from '../types/message';
+
+// Interface to flatten legacy replies into our new single-message format
+interface ChatBubble {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  text: string;
+  isSenderAdmin: boolean;
+  createdAt: Date;
+  isLegacyReply?: boolean;
+}
 
 export const AdminDashboard: React.FC = () => {
   const [tabIndex, setTabIndex] = useState(0);
@@ -39,7 +52,6 @@ export const AdminDashboard: React.FC = () => {
       setUsers(fetchedUsers);
       setMessages(fetchedMessages);
       
-      // Marca mensagens como lidas pelo admin se a aba de mensagens estiver aberta
       if (tabIndex === 1) {
         fetchedMessages.forEach(msg => {
           if (!msg.isReadByAdmin && msg.id) {
@@ -57,7 +69,7 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     void fetchData();
-  }, [tabIndex]); // Re-fetch or mark read when tab changes
+  }, [tabIndex]);
 
   const handleToggleUnlock = async (uid: string, currentStatus: boolean) => {
     try {
@@ -89,15 +101,12 @@ export const AdminDashboard: React.FC = () => {
     });
   };
 
-  const handleReply = async (messageId: string) => {
-    const text = replyText[messageId];
+  const handleReply = async (userId: string, userEmail: string, userName: string) => {
+    const text = replyText[userId];
     if (!text || !text.trim()) return;
     try {
-      const existingMessage = messages.find(m => m.id === messageId);
-      const newReply = existingMessage?.reply ? `${existingMessage.reply}\n\n[Nova resposta]: ${text}` : text;
-      
-      await replySupportMessage(messageId, newReply);
-      setReplyText(prev => ({ ...prev, [messageId]: '' }));
+      await replySupportMessage(userId, userEmail, userName, text);
+      setReplyText(prev => ({ ...prev, [userId]: '' }));
       await fetchData();
     } catch (err) {
       console.error(err);
@@ -105,34 +114,73 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteConversation = (userId: string) => {
-    setConfirmDialog({
-      open: true,
-      title: 'Apagar Conversa',
-      message: 'Tem certeza que deseja apagar toda a conversa com este usuário? O histórico será perdido.',
-      onConfirm: async () => {
-        handleCloseConfirm();
-        try {
-          setLoading(true);
-          const userMsgs = messages.filter(m => m.userId === userId);
-          await Promise.all(userMsgs.map(m => m.id ? deleteSupportMessage(m.id) : Promise.resolve()));
-          await fetchData();
-        } catch (err) {
-          console.error(err);
-          setError("Erro ao excluir conversa.");
-          setLoading(false);
-        }
+  const handleDeleteSingleMessage = async (messageId: string, isLegacyReply?: boolean) => {
+    try {
+      if (isLegacyReply) {
+        // If it's a legacy reply, we can't easily delete just the reply without updating the doc, 
+        // but since we are migrating, we can just warn or ignore. To keep it simple, we delete the whole doc.
+        await deleteSupportMessage(messageId.replace('-reply', ''));
+      } else {
+        await deleteSupportMessage(messageId);
       }
-    });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setError("Erro ao excluir mensagem.");
+    }
   };
 
-  const groupedMessages = Object.values(
-    messages.reduce((acc, msg) => {
-      if (!acc[msg.userId]) acc[msg.userId] = [];
-      acc[msg.userId].push(msg);
-      return acc;
-    }, {} as Record<string, SupportMessage[]>)
-  );
+  const handleDeleteConversation = async (userId: string) => {
+    try {
+      setLoading(true);
+      const userMsgs = messages.filter(m => m.userId === userId);
+      await Promise.all(userMsgs.map(m => m.id ? deleteSupportMessage(m.id) : Promise.resolve()));
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setError("Erro ao excluir conversa.");
+      setLoading(false);
+    }
+  };
+
+  // Process and group all messages by user, flattening legacy replies
+  const threads: Record<string, ChatBubble[]> = {};
+  
+  messages.forEach(msg => {
+    if (!threads[msg.userId]) {
+      threads[msg.userId] = [];
+    }
+    
+    // Add the main message
+    threads[msg.userId].push({
+      id: msg.id || Math.random().toString(),
+      userId: msg.userId,
+      userEmail: msg.userEmail,
+      userName: msg.userName,
+      text: msg.text,
+      isSenderAdmin: msg.sender === 'admin',
+      createdAt: msg.createdAt,
+    });
+    
+    // Add legacy reply if it exists
+    if (msg.reply && msg.sender !== 'admin') {
+      threads[msg.userId].push({
+        id: (msg.id || Math.random().toString()) + '-reply',
+        userId: msg.userId,
+        userEmail: msg.userEmail,
+        userName: msg.userName,
+        text: msg.reply,
+        isSenderAdmin: true,
+        createdAt: msg.repliedAt || msg.createdAt,
+        isLegacyReply: true,
+      });
+    }
+  });
+
+  // Sort bubbles in each thread chronologically
+  Object.keys(threads).forEach(userId => {
+    threads[userId].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  });
 
   if (loading) {
     return (
@@ -206,38 +254,38 @@ export const AdminDashboard: React.FC = () => {
 
       {tabIndex === 1 && (
         <Box>
-          {groupedMessages.length === 0 ? (
+          {Object.keys(threads).length === 0 ? (
             <Typography>Nenhuma mensagem.</Typography>
           ) : (
-            groupedMessages.map((thread) => {
-              const user = thread[0];
-              const chronologicalThread = [...thread].reverse();
-              const isExpanded = expandedThreads[user.userId] || false;
+            Object.values(threads).map((thread) => {
+              if (thread.length === 0) return null;
+              const latestMsg = thread[thread.length - 1];
+              const isExpanded = expandedThreads[latestMsg.userId] || false;
               
               const toggleThread = (userId: string) => {
                 setExpandedThreads(prev => ({ ...prev, [userId]: !prev[userId] }));
               };
 
               return (
-                <Paper key={user.userId} sx={{ mb: 4, bgcolor: '#f8f9fa', overflow: 'hidden' }}>
+                <Paper key={latestMsg.userId} sx={{ mb: 4, bgcolor: '#f8f9fa', overflow: 'hidden' }}>
                   <Box 
                     sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', bgcolor: isExpanded ? '#e0e0e0' : 'transparent' }}
-                    onClick={() => toggleThread(user.userId)}
+                    onClick={() => toggleThread(latestMsg.userId)}
                   >
                     <Box>
                       <Typography variant="h6">
-                        {user.userName} ({user.userEmail})
+                        {latestMsg.userName} ({latestMsg.userEmail})
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Última mensagem: {user.createdAt.toLocaleDateString()} às {user.createdAt.toLocaleTimeString()}
+                        Última interação: {latestMsg.createdAt.toLocaleDateString()} às {latestMsg.createdAt.toLocaleTimeString()}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <Typography variant="button" color="primary">
-                        {isExpanded ? "Esconder" : "Abrir"}
+                        {isExpanded ? "Minimizar" : "Abrir"}
                       </Typography>
-                      <Button variant="outlined" color="error" size="small" onClick={(e) => { e.stopPropagation(); void handleDeleteConversation(user.userId); }}>
-                        Apagar
+                      <Button variant="outlined" color="error" size="small" onClick={(e) => { e.stopPropagation(); void handleDeleteConversation(latestMsg.userId); }}>
+                        Apagar Conversa
                       </Button>
                     </Box>
                   </Box>
@@ -245,30 +293,39 @@ export const AdminDashboard: React.FC = () => {
                   {isExpanded && (
                     <Box sx={{ p: 2, pt: 0 }}>
                       <Box sx={{ maxHeight: 400, overflowY: 'auto', p: 1, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: 1, mb: 2, mt: 2 }}>
-                        {chronologicalThread.map((msg) => (
-                          <React.Fragment key={msg.id}>
-                            {/* User Message */}
-                            <Box sx={{ alignSelf: 'flex-start', bgcolor: '#dcf8c6', p: 1.5, borderRadius: 2, maxWidth: '80%', boxShadow: 1 }}>
-                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
-                                {msg.createdAt.toLocaleString()}
+                        {thread.map((bubble) => (
+                          <Box 
+                            key={bubble.id} 
+                            sx={{ 
+                              alignSelf: bubble.isSenderAdmin ? 'flex-end' : 'flex-start', 
+                              bgcolor: bubble.isSenderAdmin ? '#e3f2fd' : '#dcf8c6', 
+                              p: 1.5, 
+                              borderRadius: 2, 
+                              maxWidth: '80%', 
+                              boxShadow: 1,
+                              position: 'relative',
+                              '&:hover .delete-btn': { opacity: 1 }
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                {bubble.createdAt.toLocaleString()}
                               </Typography>
-                              <Typography variant="body1">
-                                {msg.text}
-                              </Typography>
+                              <IconButton 
+                                className="delete-btn"
+                                size="small" 
+                                color="error" 
+                                sx={{ opacity: 0, transition: 'opacity 0.2s', padding: 0, ml: 1 }}
+                                onClick={() => void handleDeleteSingleMessage(bubble.id, bubble.isLegacyReply)}
+                                title="Apagar mensagem"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
                             </Box>
-                            
-                            {/* Admin Reply */}
-                            {msg.reply && (
-                              <Box sx={{ alignSelf: 'flex-end', bgcolor: '#e3f2fd', p: 1.5, borderRadius: 2, maxWidth: '80%', ml: 'auto', boxShadow: 1 }}>
-                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.7rem', mb: 0.5 }}>
-                                  {msg.repliedAt?.toLocaleString() || ''}
-                                </Typography>
-                                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                                  {msg.reply}
-                                </Typography>
-                              </Box>
-                            )}
-                          </React.Fragment>
+                            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+                              {bubble.text}
+                            </Typography>
+                          </Box>
                         ))}
                       </Box>
                       
@@ -277,14 +334,16 @@ export const AdminDashboard: React.FC = () => {
                           size="small"
                           fullWidth
                           placeholder="Enviar resposta..."
-                          value={replyText[user.userId] || ''}
-                          onChange={(e) => setReplyText({ ...replyText, [user.userId]: e.target.value })}
+                          value={replyText[latestMsg.userId] || ''}
+                          onChange={(e) => setReplyText({ ...replyText, [latestMsg.userId]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              void handleReply(latestMsg.userId, latestMsg.userEmail, latestMsg.userName);
+                            }
+                          }}
                         />
-                        <Button variant="contained" onClick={() => {
-                          // Attach reply to the most recent message in the thread
-                          void handleReply(user.id!);
-                          setReplyText({ ...replyText, [user.userId]: '' });
-                        }}>
+                        <Button variant="contained" onClick={() => void handleReply(latestMsg.userId, latestMsg.userEmail, latestMsg.userName)}>
                           Responder
                         </Button>
                       </Box>
