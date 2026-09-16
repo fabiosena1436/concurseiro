@@ -6,5 +6,4 @@ export interface UserProfile {
   phone: string | null;
   generationCount?: number;
   isUnlocked?: boolean;
-  isAdmin?: boolean;
 }

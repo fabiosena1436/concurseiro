@@ -8,28 +8,38 @@ import type { UserProfile } from '../types/user';
 export const useAuth = () => {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<UserProfile | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             setUser(user);
+
             if (user) {
                 void (async () => {
                     try {
+                        const tokenResult = await user.getIdTokenResult();
+                        setIsAdmin(Boolean(tokenResult.claims.admin));
+
                         const userDocRef = doc(db, 'users', user.uid);
                         const userDocSnap = await getDoc(userDocRef);
                         if (userDocSnap.exists()) {
-                            setUserData(userDocSnap.data() as UserProfile);
+                            const data = userDocSnap.data() as UserProfile;
+                            setUserData(data);
+                        } else {
+                            setUserData(null);
                         }
                     } catch (error) {
                         console.error("Error fetching user data:", error);
                         setUserData(null);
+                        setIsAdmin(false);
                     } finally {
                         setLoading(false);
                     }
                 })();
             } else {
                 setUserData(null);
+                setIsAdmin(false);
                 setLoading(false);
             }
         });
@@ -37,5 +47,5 @@ export const useAuth = () => {
         return () => unsubscribe();
     }, []);
 
-    return { user, userData, loading };
+    return { user, userData, isAdmin, loading };
 };

@@ -8,6 +8,7 @@ import * as cors from "cors";
 // Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)
 const geminiApiKey = defineString("GEMINI_API_KEY");
 const geminiModelStr = defineString("GEMINI_MODEL", {default: "gemini-2.5-flash"});
+const adminEmailsConfig = defineString("ADMIN_EMAILS", { default: "" });
 
 // 2. CONFIGURAÇÃO DO CORS
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
@@ -53,6 +54,51 @@ const getRelevantContext = (content: string): string => {
     return "Nenhum conteúdo de edital fornecido. Usar o tópico principal.";
   }
   return content.substring(0, 4000);
+};
+
+const getAllowedAdminEmails = (): Set<string> => {
+  const raw = adminEmailsConfig.value().trim();
+  if (!raw) {
+    return new Set();
+  }
+
+  return new Set(
+    raw
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+};
+
+const requireAdminToken = async (request: any, response: any): Promise<admin.auth.DecodedIdToken | null> => {
+  const idToken = request.headers.authorization?.split("Bearer ")[1];
+  if (!idToken) {
+    response.status(401).send({ error: { message: "Unauthorized. No token provided." } });
+    return null;
+  }
+
+  let decodedToken: admin.auth.DecodedIdToken;
+  try {
+    decodedToken = await admin.auth().verifyIdToken(idToken);
+  } catch (error) {
+    console.error("Error verifying ID token:", error);
+    response.status(401).send({ error: { message: "Unauthorized. Invalid token." } });
+    return null;
+  }
+
+  const allowedAdmins = getAllowedAdminEmails();
+  if (allowedAdmins.size === 0) {
+    response.status(500).send({ error: { message: "ADMIN_EMAILS is not configured for this environment." } });
+    return null;
+  }
+
+  const emailLower = decodedToken.email?.toLowerCase() ?? "";
+  if (!allowedAdmins.has(emailLower)) {
+    response.status(403).send({ error: { message: "Forbidden. Admin access required." } });
+    return null;
+  }
+
+  return decodedToken;
 };
 
 const createPrompt = (data: {
@@ -160,14 +206,14 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
 
     const uid = decodedToken.uid;
     const userDocRef = admin.firestore().collection("users").doc(uid);
-    
+
     try {
       const userDoc = await userDocRef.get();
       if (userDoc.exists) {
         const userData = userDoc.data();
         const generationCount = userData?.generationCount || 0;
         const isUnlocked = userData?.isUnlocked || false;
-        
+
         if (!isUnlocked && generationCount >= 3) {
           response.status(403).send({ error: { message: "Você atingiu o limite de 3 simulados gerados. Para continuar testando ou ter acesso ilimitado, entre em contato via e-mail e realize o pagamento de R$30,00 para desbloqueio da sua conta.", status: "PERMISSION_DENIED", isLimitReached: true } });
           return;
@@ -273,6 +319,43 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
   });
 });
 
+export const grantAdminAccess = onRequest({ timeoutSeconds: 60 }, (request, response) => {
+  corsHandler(request, response, async () => {
+    if (request.method !== 'POST') {
+      response.status(405).send({ error: { message: "Method Not Allowed" } });
+      return;
+    }
+
+    const caller = await requireAdminToken(request, response);
+    if (!caller) {
+      return;
+    }
+
+    const targetEmail = (request.body?.email || request.body?.data?.email || '').trim();
+    if (!targetEmail) {
+      response.status(400).send({ error: { message: "email is required." } });
+      return;
+    }
+
+    try {
+      const userRecord = await admin.auth().getUserByEmail(targetEmail);
+      await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+
+      response.status(200).send({
+        data: {
+          success: true,
+          uid: userRecord.uid,
+          email: targetEmail,
+          message: "Admin access granted successfully."
+        }
+      });
+    } catch (error: any) {
+      console.error("Error granting admin access:", error);
+      response.status(500).send({ error: { message: "Failed to grant admin access.", details: error.message } });
+    }
+  });
+});
+
 export const deleteUserByAdmin = onRequest({timeoutSeconds: 60}, (request, response) => {
   corsHandler(request, response, async () => {
     if (request.method !== 'POST') {
@@ -280,24 +363,8 @@ export const deleteUserByAdmin = onRequest({timeoutSeconds: 60}, (request, respo
       return;
     }
 
-    const idToken = request.headers.authorization?.split("Bearer ")[1];
-    if (!idToken) {
-      response.status(401).send({ error: { message: "Unauthorized. No token provided." } });
-      return;
-    }
-
-    let decodedToken;
-    try {
-      decodedToken = await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-      console.error("Error verifying ID token:", error);
-      response.status(401).send({ error: { message: "Unauthorized. Invalid token." } });
-      return;
-    }
-
-    // Verify admin
-    if (decodedToken.email !== 'fabiosena1436@gmail.com') {
-      response.status(403).send({ error: { message: "Forbidden. Admin access required." } });
+    const decodedToken = await requireAdminToken(request, response);
+    if (!decodedToken) {
       return;
     }
 
@@ -308,11 +375,9 @@ export const deleteUserByAdmin = onRequest({timeoutSeconds: 60}, (request, respo
     }
 
     try {
-      // Delete from Firebase Auth
       await admin.auth().deleteUser(uidToDelete);
-      // Delete from Firestore
       await admin.firestore().collection("users").doc(uidToDelete).delete();
-      
+
       response.status(200).send({ data: { success: true, message: "User deleted successfully." } });
     } catch (error: any) {
       console.error("Error deleting user:", error);

@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { useAuth } from './useAuth';
 
 export const useUnreadMessages = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [adminUnreadCount, setAdminUnreadCount] = useState(0);
 
@@ -15,7 +15,6 @@ export const useUnreadMessages = () => {
       return;
     }
 
-    // Listener for regular user
     const userQuery = query(
       collection(db, 'messages'),
       where('userId', '==', user.uid)
@@ -30,13 +29,12 @@ export const useUnreadMessages = () => {
     });
 
     let unsubscribeAdmin = () => {};
-    // Listener for admin (could be optimized to only run if user is admin)
-    if (user.email === 'fabiosena1436@gmail.com' || (user as any).isAdmin) {
+    if (isAdmin) {
       const adminQuery = query(
         collection(db, 'messages'),
         where('isReadByAdmin', '==', false)
       );
-      
+
       unsubscribeAdmin = onSnapshot(adminQuery, (snapshot) => {
         setAdminUnreadCount(snapshot.docs.length);
       });
@@ -46,7 +44,7 @@ export const useUnreadMessages = () => {
       unsubscribeUser();
       unsubscribeAdmin();
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   return { unreadCount, adminUnreadCount };
 };

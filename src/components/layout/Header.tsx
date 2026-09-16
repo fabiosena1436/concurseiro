@@ -8,7 +8,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { useTheme } from '@mui/material/styles';
 
 export const Header: React.FC = () => {
-  const { user, userData } = useAuth();
+  const { user, userData, isAdmin } = useAuth();
   const { unreadCount, adminUnreadCount } = useUnreadMessages();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -44,7 +44,7 @@ export const Header: React.FC = () => {
               </Badge>
             } />
           </ListItemButton>
-          {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
+          {isAdmin && (
             <ListItemButton component={Link} to="/admin" onClick={handleDrawerToggle}>
               <ListItemText primary={
                 <Badge badgeContent={adminUnreadCount} color="error" sx={{ '& .MuiBadge-badge': { right: -15, top: 10 } }}>
@@ -128,7 +128,7 @@ export const Header: React.FC = () => {
                     Suporte
                   </Badge>
                 </Button>
-                {(user.email === 'fabiosena1436@gmail.com' || userData?.isAdmin) && (
+                {isAdmin && (
                   <Button color="inherit" component={Link} to="/admin">
                     <Badge badgeContent={adminUnreadCount} color="error">
                       Admin

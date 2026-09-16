@@ -99,24 +99,80 @@ VITE_APP_ID="SEU_APP_ID"
 ```
 
 ### 5. Configurar Regras de Segurança do Firestore
-Para que a aplicação possa ler e escrever no Firestore, você precisa ajustar as regras de segurança no console do Firebase:
+Para que a aplicação possa ler e escrever no Firestore com segurança, use regras por usuário e por papel.
 
 1.  Acesse o **Console do Firebase**.
 2.  Vá em **Cloud Firestore** > **Regras**.
-3.  Substitua as regras existentes pelas seguintes, que permitem acesso apenas a usuários autenticados:
+3.  Substitua as regras existentes pelas abaixo:
 ```firestore
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(uid) {
+    return isSignedIn() && request.auth.uid == uid;
+  }
+
+  function isAdmin() {
+    return isSignedIn() && request.auth.token.admin == true;
+  }
+
+  match /users/{uid} {
+    allow read: if isOwner(uid) || isAdmin();
+    allow create: if isOwner(uid)
+      && request.resource.data.uid == uid
+      && request.resource.data.email == request.auth.token.email;
+    allow update: if isOwner(uid)
+      && request.resource.data.uid == uid
+      && request.resource.data.email == request.auth.token.email;
+    allow delete: if isAdmin();
+  }
+
+  match /results/{resultId} {
+    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+  }
+
+  match /messages/{messageId} {
+    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    allow delete: if isAdmin();
+  }
+
+  match /exams/{examId} {
+    allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
+    allow read: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.creatorId == request.auth.uid);
   }
 }
 ```
 4.  Clique em **Publicar**.
 
-### 6. Rodar o Projeto
+Observação: para que a regra `request.auth.token.admin == true` funcione, o usuário precisa ter um custom claim de administrador configurado no Firebase Authentication.
+
+### 6. Ativar acesso administrativo (custom claims)
+Para que um usuário tenha acesso ao painel administrativo, configure a lista de administradores no ambiente das Functions e chame a Cloud Function de bootstrap:
+
+```bash
+firebase functions:config:set ADMIN_EMAILS="admin@seu-dominio.com"
+```
+
+Depois, em um terminal autenticado com o usuário administrador, execute:
+
+```bash
+curl -X POST "https://us-central1-SEU_PROJETO.cloudfunctions.net/grantAdminAccess" \
+  -H "Authorization: Bearer $(firebase auth:print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@seu-dominio.com"}'
+```
+
+A função só aceita e-mails listados em `ADMIN_EMAILS`. A partir daí, o Firebase terá um custom claim `admin: true` e a rota `/admin` passará a funcionar corretamente.
+
+### 7. Rodar o Projeto
 Com tudo configurado, inicie o servidor de desenvolvimento:
 
 ```bash
@@ -124,7 +180,7 @@ yarn dev
 ```
 A aplicação estará disponível em `http://localhost:5173`.
 
-### 7. Configurar Índices do Firestore
+### 8. Configurar Índices do Firestore
 Algumas consultas no banco de dados (como buscar o histórico de um usuário ordenado por data) exigem índices compostos. 
 
 Se você encontrar o erro `FirebaseError: The query requires an index`, siga estes passos:

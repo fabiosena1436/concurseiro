@@ -12,11 +12,26 @@ import {
   Timestamp,
   updateDoc,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { db } from "./firebase";
 import type { Exam } from "../types/exam";
 import type { Result } from "../types/result";
 import type { UserProfile } from "../types/user";
 import type { SupportMessage } from "../types/message";
+
+const ensureAuthenticatedUser = async (): Promise<void> => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error("Você precisa estar autenticado.");
+  }
+
+  const tokenResult = await user.getIdTokenResult();
+  if (!tokenResult.claims.admin) {
+    throw new Error("Acesso de administrador obrigatório.");
+  }
+};
 
 const examsCollection = collection(db, "exams");
 const resultsCollection = collection(db, "results");
@@ -40,6 +55,8 @@ export const sendSupportMessage = async (message: Omit<SupportMessage, "id" | "c
  * Responde uma mensagem de suporte (Admin).
  */
 export const replySupportMessage = async (userId: string, userEmail: string, userName: string, replyText: string): Promise<void> => {
+  await ensureAuthenticatedUser();
+
   await addDoc(messagesCollection, {
     userId,
     userEmail,
@@ -74,6 +91,8 @@ export const getUserMessages = async (userId: string): Promise<SupportMessage[]>
  * Busca todas as mensagens (Para o Admin).
  */
 export const getAllMessages = async (): Promise<SupportMessage[]> => {
+  await ensureAuthenticatedUser();
+
   const q = query(messagesCollection);
   const snapshot = await getDocs(q);
   const msgs = snapshot.docs.map(doc => {
@@ -102,6 +121,8 @@ export const markMessageAsReadByUser = async (messageId: string): Promise<void> 
  * Marca uma mensagem como lida pelo Admin.
  */
 export const markMessageAsReadByAdmin = async (messageId: string): Promise<void> => {
+  await ensureAuthenticatedUser();
+
   const msgRef = doc(db, "messages", messageId);
   await updateDoc(msgRef, {
     isReadByAdmin: true
@@ -112,6 +133,8 @@ export const markMessageAsReadByAdmin = async (messageId: string): Promise<void>
  * Deleta uma mensagem de suporte.
  */
 export const deleteSupportMessage = async (messageId: string): Promise<void> => {
+  await ensureAuthenticatedUser();
+
   const msgRef = doc(db, "messages", messageId);
   await deleteDoc(msgRef);
 };
@@ -120,6 +143,8 @@ export const deleteSupportMessage = async (messageId: string): Promise<void> => 
  * Busca todos os usuários do sistema (Para o painel Admin).
  */
 export const getAllUsers = async (): Promise<UserProfile[]> => {
+  await ensureAuthenticatedUser();
+
   const querySnapshot = await getDocs(usersCollection);
   return querySnapshot.docs.map(doc => doc.data() as UserProfile);
 };
@@ -128,6 +153,8 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
  * Atualiza o status de desbloqueio de um usuário.
  */
 export const toggleUserUnlockStatus = async (uid: string, isUnlocked: boolean): Promise<void> => {
+  await ensureAuthenticatedUser();
+
   const userDocRef = doc(db, "users", uid);
   await updateDoc(userDocRef, {
     isUnlocked: isUnlocked
