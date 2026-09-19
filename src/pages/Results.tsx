@@ -34,7 +34,7 @@ export const Results: React.FC = () => {
       return;
     }
     if (!resultId || !user) {
-      navigate('/');
+      void navigate('/');
       return;
     }
 

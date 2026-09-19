@@ -18,16 +18,29 @@ Este projeto foi desenvolvido com tecnologias web modernas, incluindo **React**,
 -   ✅ **Rotas Protegidas**: O acesso a páginas como o Dashboard e o criador de simulados é restrito a usuários autenticados.
 -   ✅ **Gerenciamento de Estado**: Hook customizado `useAuth` para gerenciar o estado de autenticação do usuário em toda a aplicação.
 -   ✅ **Banco de Dados**: Integração com **Cloud Firestore** para salvar e recuperar dados de simulados e resultados.
--   ✅ **Estilização Profissional**: Componentização de estilos com **styled-components**, utilizando um tema global para consistência visual.
+-   ✅ **Estudo a partir de PDF**: O aluno pode enviar um PDF pesquisável da aula e gerar questões baseadas exclusivamente no texto extraído do próprio material. O arquivo não é salvo; somente o texto necessário para a geração é enviado à Cloud Function.
+-   ✅ **Estilização Profissional**: Interface baseada em **Material UI**, com componentes responsivos e feedback visual para leitura do PDF e geração das questões.
+
+## 📄 Como funciona o estudo com PDF
+
+Na tela **Criar Simulado**, selecione **Por PDF da aula** para:
+
+1. informar um nome para o material;
+2. selecionar um PDF com texto pesquisável;
+3. acompanhar a extração das páginas no próprio navegador;
+4. escolher o estilo, a dificuldade e gerar as questões.
+
+O fluxo aceita arquivos de até **20 MB**, **80 páginas** e **120 mil caracteres extraídos**. PDFs escaneados sem OCR não podem ser lidos pelo navegador; nesse caso, use uma versão com texto selecionável. O PDF não é persistido no Firebase Storage: depois da leitura, somente o texto extraído é enviado autenticado à Cloud Function. O backend usa delimitadores e regras específicas para tratar esse texto como a única fonte de verdade, sem completar respostas com conhecimento externo.
 
 ## 🚀 Roadmap de Desenvolvimento (Próximos Passos)
 
 O projeto tem uma base sólida, mas ainda há funcionalidades importantes a serem implementadas para torná-lo uma ferramenta de estudos completa.
 
 ### 1. Módulo: Criador de Simulados
--   [ ] **Integração com IA**: Conectar o formulário a uma API de IA (como Gemini, GPT, etc.) para gerar questões dinamicamente com base nos parâmetros selecionados pelo usuário (matéria, dificuldade, etc.).
--   [ ] **Salvar no Firestore**: Aprimorar a função `createExam` para salvar o simulado gerado pela IA no Firestore.
--   [ ] **Redirecionamento Pós-Criação**: Garantir que o usuário seja redirecionado para a URL da prova recém-criada (`/simulado/<id-do-simulado>`).
+-   ✅ **Geração com IA**: Questões geradas pela Cloud Function com Gemini a partir de matéria, edital ou material enviado.
+-   ✅ **Estudo com PDF**: Leitura local de PDFs pesquisáveis e envio apenas do texto extraído. A geração em modo PDF instrui e valida o backend para não usar conhecimento externo como fonte factual.
+-   ✅ **Salvar no Firestore**: O simulado e suas questões são salvos depois da geração bem-sucedida.
+-   ✅ **Redirecionamento Pós-Criação**: O usuário é levado para a prova recém-criada (`/simulado/<id-do-simulado>`).
 
 ### 2. Módulo: Ambiente de Prova
 -   [ ] **Lógica do Cronômetro**: Implementar a finalização automática do simulado quando o tempo se esgotar.
@@ -62,7 +75,7 @@ Para executar este projeto localmente, siga os passos abaixo:
 
 ### 1. Pré-requisitos
 
--   [Node.js](https://nodejs.org/) (versão 18 ou superior)
+-   [Node.js](https://nodejs.org/) (versão 20 ou superior)
 -   [Yarn](https://yarnpkg.com/) (gerenciador de pacotes)
 -   Uma conta no [Firebase](https://firebase.google.com/) com um projeto web criado.
 
@@ -96,6 +109,8 @@ VITE_PROJECT_ID="SEU_PROJECT_ID"
 VITE_STORAGE_BUCKET="SEU_STORAGE_BUCKET"
 VITE_MESSAGING_SENDER_ID="SEU_MESSAGING_SENDER_ID"
 VITE_APP_ID="SEU_APP_ID"
+# Opcional: altere apenas se a Cloud Function estiver em outro projeto
+VITE_GENERATE_QUESTIONS_URL="https://us-central1-simulado-concurso-ia.cloudfunctions.net/generateQuestions"
 ```
 
 ### 5. Configurar Regras de Segurança do Firestore

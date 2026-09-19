@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin, deleteSupportMessage } from '../services/firestoreService';
@@ -42,7 +42,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleCloseConfirm = () => setConfirmDialog(prev => ({ ...prev, open: false }));
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [fetchedUsers, fetchedMessages] = await Promise.all([
@@ -65,11 +65,11 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tabIndex]);
 
   useEffect(() => {
     void fetchData();
-  }, [tabIndex]);
+  }, [fetchData]);
 
   const handleToggleUnlock = async (uid: string, currentStatus: boolean) => {
     try {
@@ -86,17 +86,19 @@ export const AdminDashboard: React.FC = () => {
       open: true,
       title: 'Excluir Usuário',
       message: 'Tem certeza que deseja excluir permanentemente este usuário? Esta ação não pode ser desfeita.',
-      onConfirm: async () => {
-        handleCloseConfirm();
-        try {
-          setLoading(true);
-          await deleteUserAccount(uid);
-          await fetchData();
-        } catch (err: any) {
-          console.error(err);
-          setError(err.message || "Erro ao deletar usuário.");
-          setLoading(false);
-        }
+      onConfirm: () => {
+        void (async () => {
+          handleCloseConfirm();
+          try {
+            setLoading(true);
+            await deleteUserAccount(uid);
+            await fetchData();
+          } catch (err: unknown) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : "Erro ao deletar usuário.");
+            setLoading(false);
+          }
+        })();
       }
     });
   };

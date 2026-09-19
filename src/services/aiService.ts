@@ -1,25 +1,60 @@
-import { functions, auth } from './firebase';
-import { type Question } from '../types/exam';
+import { auth } from './firebase';
+import type { Question, QuestionSource } from '../types/exam';
 
-const functionURL = 'https://us-central1-simulado-concurso-ia.cloudfunctions.net/generateQuestions';
+const functionURL = import.meta.env.VITE_GENERATE_QUESTIONS_URL ||
+  'https://us-central1-simulado-concurso-ia.cloudfunctions.net/generateQuestions';
 
-export const generateQuestionsFromBank = async (
-  subject: string,
-  numQuestions: number,
-  banca: string,
-  difficulty: 'fundamental' | 'medio' | 'superior',
-  editalContent?: string,
-  existingQuestions?: Question[],
-  specificContent?: string
-): Promise<Question[]> => {
+export interface GenerateQuestionsOptions {
+  subject: string;
+  numQuestions: number;
+  banca: string;
+  difficulty: 'fundamental' | 'medio' | 'superior';
+  sourceType?: QuestionSource;
+  editalContent?: string;
+  pdfContent?: string;
+  pdfFileName?: string;
+  existingQuestions?: Pick<Question, 'question'>[];
+  specificContent?: string;
+}
+
+type ApiResponse = {
+  data?: unknown;
+  error?: {
+    message?: string;
+  };
+};
+
+const isApiResponse = (value: unknown): value is ApiResponse => (
+  typeof value === 'object' && value !== null
+);
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Ocorreu um erro desconhecido ao gerar as questões.';
+};
+
+export const generateQuestionsFromBank = async ({
+  subject,
+  numQuestions,
+  banca,
+  difficulty,
+  sourceType = 'topic',
+  editalContent,
+  pdfContent,
+  pdfFileName,
+  existingQuestions,
+  specificContent,
+}: GenerateQuestionsOptions): Promise<Question[]> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Você precisa estar autenticado para gerar questões.');
+  }
+
   try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('Você precisa estar autenticado para gerar questões.');
-    }
-
     const token = await user.getIdToken();
-
     const response = await fetch(functionURL, {
       method: 'POST',
       headers: {
@@ -32,52 +67,38 @@ export const generateQuestionsFromBank = async (
           numQuestions,
           banca,
           difficulty,
+          sourceType,
           editalContent,
+          pdfContent,
+          pdfFileName,
           existingQuestions,
           specificContent,
-        }
+        },
       }),
     });
 
-    const result = await response.json();
+    const result: unknown = await response.json();
 
     if (!response.ok) {
-      // A resposta de erro da nossa função agora está em result.error
-      const errorPayload = result.error || { message: 'Erro desconhecido', status: 'UNKNOWN' };
-      console.error("Erro ao chamar a função da nuvem 'generateQuestions':", errorPayload);
-      // Lançamos um erro com a mensagem da API para ser pego pelo bloco catch
-      throw new Error(errorPayload.message || 'Falha ao buscar dados.');
+      const errorMessage = isApiResponse(result) && result.error?.message
+        ? result.error.message
+        : 'Falha ao buscar dados da inteligência artificial.';
+      throw new Error(errorMessage);
     }
 
-    // The raw HTTP response from a callable function wraps the payload in a 'data' key for success.
-    const questions = result.data as Question[];
-
-
-    if (!Array.isArray(questions)) {
-        console.error("A API não retornou um array de questões no campo 'data'. Resposta recebida:", result);
-        throw new Error("A resposta da API de geração de questões não teve o formato esperado.");
+    const responseData = isApiResponse(result) ? result.data : undefined;
+    if (!Array.isArray(responseData)) {
+      throw new Error('A resposta da geração de questões não teve o formato esperado.');
     }
-    
-    return questions.map((q, index) => ({
-      ...q,
-      id: `${subject}-${banca.toLowerCase().replace(/\s/g, '')}-${index}`,
-      subject: subject,
+
+    return responseData.map((question, index) => ({
+      ...(question as Question),
+      id: `${subject}-${banca.toLowerCase().replace(/\s/g, '')}-${Date.now()}-${index}`,
+      subject,
     }));
-
-  } catch (error: any) {
-    // O erro pode ser da rede (fetch falhou) ou o que lançamos acima
+  } catch (error: unknown) {
+    const errorMessage = getErrorMessage(error);
     console.error("Falha na operação de generateQuestionsFromBank:", error);
-
-    let errorMessage = error.message || "Ocorreu um erro desconhecido ao gerar as questões.";
-
-    const fallbackQuestion: Question = {
-      id: 'error-0',
-      question: errorMessage,
-      options: ['Tente novamente', 'Verifique os parâmetros', 'Tente mais tarde', 'Contate o suporte'],
-      correctAnswer: 0,
-      explanation: `A chamada para a API falhou. Causa: ${errorMessage}. Verifique o console do navegador (aba 'Rede' e 'Console') e os logs da Cloud Function para mais detalhes.`,
-      subject: subject,
-    };
-    return [fallbackQuestion];
+    throw new Error(errorMessage);
   }
 };

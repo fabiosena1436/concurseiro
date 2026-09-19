@@ -39,7 +39,7 @@ export const Exam: React.FC = () => {
 
   useEffect(() => {
     if (!examId) {
-      navigate('/');
+      void navigate('/');
       return;
     }
 
@@ -128,7 +128,7 @@ export const Exam: React.FC = () => {
         score: parseFloat(score.toFixed(2)),
         timeTaken,
       });
-      navigate(`/resultados/${resultId}`);
+      void navigate(`/resultados/${resultId}`);
     } catch (err) {
       console.error(err);
       setError("Falha ao salvar o resultado.");
@@ -155,8 +155,15 @@ export const Exam: React.FC = () => {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">{exam.title}</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h4" component="h1">{exam.title}</Typography>
+          {exam.sourceType === 'pdf' && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Questões baseadas no PDF: {exam.sourceName || 'material enviado'}
+            </Typography>
+          )}
+        </Box>
         <Chip label={`Tempo: ${formatTime(timeLeft)}`} color="secondary" />
       </Box>
 

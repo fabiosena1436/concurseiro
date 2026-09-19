@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Container, Typography, Box, TextField, Button, Paper, CircularProgress, Alert, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../hooks/useAuth';
@@ -22,7 +22,7 @@ export const Support: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!user) return;
     try {
       const data = await getUserMessages(user.uid);
@@ -42,11 +42,11 @@ export const Support: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     void fetchMessages();
-  }, [user]);
+  }, [fetchMessages]);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();

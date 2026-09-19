@@ -130,7 +130,7 @@ export const Dashboard: React.FC = () => {
               {results.map((result, index) => (
                 <ListItemButton
                   key={result.id}
-                  onClick={() => navigate(`/resultados/${result.id}`)}
+                  onClick={() => { void navigate(`/resultados/${result.id}`); }}
                   divider={index < results.length - 1}
                 >
                   {/* 2. APLICAR FUNÇÃO NO TÍTULO E ADICIONAR TOOLTIP */}

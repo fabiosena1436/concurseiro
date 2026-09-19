@@ -17,7 +17,7 @@ export const Header: React.FC = () => {
 
   const handleLogout = async () => {
     await auth.signOut();
-    navigate('/');
+    void navigate('/');
   }
 
   const handleDrawerToggle = () => {

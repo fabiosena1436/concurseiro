@@ -1,3 +1,5 @@
+export type QuestionSource = 'topic' | 'edital' | 'pdf';
+
 export type Question = {
   id: string;
   question: string;
@@ -8,12 +10,15 @@ export type Question = {
 };
 
 export type Exam = {
-  id:string;
+  id: string;
   title: string;
   creatorId: string;
   questions: Question[];
   createdAt: Date;
   banca?: string;
+  sourceType?: QuestionSource;
+  sourceName?: string;
+  sourcePageCount?: number;
 };
 
 export type UserAnswer = {
