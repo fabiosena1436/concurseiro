@@ -203,13 +203,25 @@ export const getExam = async (examId: string): Promise<Exam | null> => {
  * @returns O ID do resultado salvo.
  */
 export const saveResult = async (
-  resultData: Omit<Result, "id" | "completedAt">
+  resultData: { examId: string; answers: { questionId: string; selectedAnswer?: number }[]; timeTaken: number }
 ): Promise<string> => {
-  const docRef = await addDoc(resultsCollection, {
-    ...resultData,
-    completedAt: serverTimestamp(),
+  const user = getAuth().currentUser;
+  if (!user) throw new Error('Você precisa estar autenticado.');
+  const token = await user.getIdToken();
+  const response = await fetch('https://us-central1-simulado-concurso-ia.cloudfunctions.net/submitExamResult', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data: resultData }),
   });
-  return docRef.id;
+  const payload: unknown = await response.json();
+  if (!response.ok || !payload || typeof payload !== 'object' || !('data' in payload)) {
+    throw new Error('Não foi possível salvar o resultado. Tente novamente.');
+  }
+  const data = (payload as { data: unknown }).data;
+  if (!data || typeof data !== 'object' || !('resultId' in data) || typeof data.resultId !== 'string') {
+    throw new Error('O servidor retornou um resultado inválido.');
+  }
+  return data.resultId;
 };
 
 /**

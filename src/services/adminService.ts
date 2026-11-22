@@ -23,10 +23,14 @@ export const deleteUserAccount = async (uidToDelete: string): Promise<void> => {
     }),
   });
 
-  const result = await response.json().catch(() => ({}));
+  const result: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const errorPayload = result?.error || { message: 'Erro desconhecido' };
-    throw new Error(errorPayload.message || 'Falha ao deletar usuário.');
+    let message = 'Falha ao deletar usuário.';
+    if (result && typeof result === 'object' && 'error' in result) {
+      const error = result.error;
+      if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') message = error.message;
+    }
+    throw new Error(message);
   }
 };

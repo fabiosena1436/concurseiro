@@ -1,209 +1,42 @@
-# 🧠 Simulado Concurso IA
+# Simulado Concurso IA
 
-Bem-vindo ao **Simulado Concurso IA**, uma plataforma de estudos inteligente projetada para ajudar candidatos a se prepararem para concursos públicos. A aplicação permite que usuários criem e realizem simulados personalizados, com questões geradas dinamicamente e um sistema robusto para análise de desempenho.
+Aplicação React, TypeScript e Firebase para criar simulados personalizados, praticar e revisar resultados. As questões são geradas por IA e podem conter erros; não são questões oficiais de bancas.
 
-Este projeto foi desenvolvido com tecnologias web modernas, incluindo **React**, **TypeScript**, e **Firebase**, com foco em modularidade, escalabilidade e uma experiência de usuário fluida.
+## Fluxo
 
-## ✨ Recursos Implementados
+1. Crie uma conta e escolha um simulado por matéria ou pelo conteúdo de um edital.
+2. Gere 10 questões. Cada conta pode gerar até três simulados gratuitamente; o desbloqueio é administrado pelo suporte.
+3. Responda em até 60 minutos. O progresso é salvo neste navegador e recuperado após recarregar a página.
+4. Entregue o simulado para receber a correção e acompanhar o histórico no painel.
 
--   ✅ **Autenticação de Usuários**: Sistema completo de cadastro e login utilizando **Firebase Authentication**.
--   ✅ **Roteamento e Navegação**: Navegação fluida entre páginas com **React Router**, incluindo rotas públicas e privadas.
--   ✅ **Páginas Essenciais**:
-    -   **Home**: Página de apresentação do projeto.
-    -   **Login/Signup**: Formulários para entrada e registro de usuários.
-    -   **Dashboard**: Painel principal que exibe o histórico de simulados do usuário.
-    -   **Exam Creator**: Interface para que o usuário crie novos simulados.
-    -   **Exam**: Ambiente de prova com cronômetro e navegação entre questões.
-    -   **Results**: Tela para visualização do resultado do simulado (a ser implementada).
--   ✅ **Rotas Protegidas**: O acesso a páginas como o Dashboard e o criador de simulados é restrito a usuários autenticados.
--   ✅ **Gerenciamento de Estado**: Hook customizado `useAuth` para gerenciar o estado de autenticação do usuário em toda a aplicação.
--   ✅ **Banco de Dados**: Integração com **Cloud Firestore** para salvar e recuperar dados de simulados e resultados.
--   ✅ **Estilização Profissional**: Componentização de estilos com **styled-components**, utilizando um tema global para consistência visual.
+## Desenvolvimento local
 
-## 🚀 Roadmap de Desenvolvimento (Próximos Passos)
-
-O projeto tem uma base sólida, mas ainda há funcionalidades importantes a serem implementadas para torná-lo uma ferramenta de estudos completa.
-
-### 1. Módulo: Criador de Simulados
--   [ ] **Integração com IA**: Conectar o formulário a uma API de IA (como Gemini, GPT, etc.) para gerar questões dinamicamente com base nos parâmetros selecionados pelo usuário (matéria, dificuldade, etc.).
--   [ ] **Salvar no Firestore**: Aprimorar a função `createExam` para salvar o simulado gerado pela IA no Firestore.
--   [ ] **Redirecionamento Pós-Criação**: Garantir que o usuário seja redirecionado para a URL da prova recém-criada (`/simulado/<id-do-simulado>`).
-
-### 2. Módulo: Ambiente de Prova
--   [ ] **Lógica do Cronômetro**: Implementar a finalização automática do simulado quando o tempo se esgotar.
--   [ ] **Marcar para Revisão**: Salvar o estado de questões marcadas para revisão e permitir que o usuário navegue facilmente até elas.
--   [ ] **Persistência de Estado**: Salvar as respostas do usuário em tempo real (no `localStorage` ou Firestore) para evitar perda de progresso.
-
-### 3. Módulo: Correção e Resultados
--   [ ] **Página de Resultados Detalhada**: Implementar a busca e exibição dos resultados na página `/resultados/:id`.
--   [ ] **Relatório de Desempenho**: Mostrar um relatório completo, comparando as respostas do usuário com o gabarito e exibindo as explicações de cada questão.
--   [ ] **Métricas de Desempenho**: Salvar métricas como nota, tempo de prova e acertos por matéria no Firestore, associadas ao perfil do usuário.
-
-### 4. Módulo: Dashboard do Usuário
--   [ ] **Gráficos de Desempenho**: Exibir gráficos que mostrem a evolução do desempenho do usuário por matéria e ao longo do tempo.
--   [ ] **Busca de Dados Reais**: Conectar o dashboard para buscar o histórico de simulados e métricas diretamente do Firestore.
-
-### 5. Melhorias de UI/UX
--   [ ] **Indicadores de Loading**: Adicionar loaders em todas as operações assíncronas (carregamento de dados, criação de simulado, etc.).
--   [ ] **Tratamento de Erros**: Implementar feedback visual para erros (ex: falha ao carregar simulado, login inválido, etc.).
--   [ ] **Componentes Reutilizáveis**: Criar novos componentes (Cards, Modais, etc.) conforme a necessidade para manter a consistência e a manutenibilidade.
-
-## 🛠️ Tecnologias Utilizadas
-
--   **Frontend**: React, TypeScript, Vite
--   **Navegação**: React Router DOM
--   **Estilização**: Styled Components
--   **Backend & Banco de Dados**: Firebase (Authentication, Firestore)
--   **Linting**: ESLint, TypeScript-ESLint
-
-## ⚙️ Guia de Instalação e Configuração
-
-Para executar este projeto localmente, siga os passos abaixo:
-
-### 1. Pré-requisitos
-
--   [Node.js](https://nodejs.org/) (versão 18 ou superior)
--   [Yarn](https://yarnpkg.com/) (gerenciador de pacotes)
--   Uma conta no [Firebase](https://firebase.google.com/) com um projeto web criado.
-
-### 2. Clonar o Repositório
+Requer Node.js 22 ou superior. Para testar regras no emulador do Firebase CLI 15, use também Java 21 ou superior.
 
 ```bash
-git clone https://github.com/seu-usuario/simulado-concurso-ia.git
-cd simulado-concurso-ia
+npm ci
+npm --prefix functions ci
 ```
 
-### 3. Instalar as Dependências
-Use o Yarn para instalar todas as dependências do projeto:
-```bash
-yarn install
-```
-
-### 4. Configurar Variáveis de Ambiente
-Este projeto requer credenciais do Firebase para funcionar.
-   
-1. Crie uma cópia do arquivo de exemplo `.env.example`:
-```bash
-cp .env.example .env
-```
-2.  Abra o arquivo `.env` e substitua os valores de placeholder pelas suas credenciais do Firebase, que podem ser encontradas no console do seu projeto Firebase (`Configurações do projeto > Geral > Seus apps`).
-
-```ini
-# .env
-VITE_API_KEY="SUA_API_KEY"
-VITE_AUTH_DOMAIN="SEU_AUTH_DOMAIN"
-VITE_PROJECT_ID="SEU_PROJECT_ID"
-VITE_STORAGE_BUCKET="SEU_STORAGE_BUCKET"
-VITE_MESSAGING_SENDER_ID="SEU_MESSAGING_SENDER_ID"
-VITE_APP_ID="SEU_APP_ID"
-```
-
-### 5. Configurar Regras de Segurança do Firestore
-Para que a aplicação possa ler e escrever no Firestore com segurança, use regras por usuário e por papel.
-
-1.  Acesse o **Console do Firebase**.
-2.  Vá em **Cloud Firestore** > **Regras**.
-3.  Substitua as regras existentes pelas abaixo:
-```firestore
-rules_version = '2';
-service cloud.firestore {
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  function isOwner(uid) {
-    return isSignedIn() && request.auth.uid == uid;
-  }
-
-  function isAdmin() {
-    return isSignedIn() && request.auth.token.admin == true;
-  }
-
-  match /users/{uid} {
-    allow read: if isOwner(uid) || isAdmin();
-    allow create: if isOwner(uid)
-      && request.resource.data.uid == uid
-      && request.resource.data.email == request.auth.token.email;
-    allow update: if isOwner(uid)
-      && request.resource.data.uid == uid
-      && request.resource.data.email == request.auth.token.email;
-    allow delete: if isAdmin();
-  }
-
-  match /results/{resultId} {
-    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-  }
-
-  match /messages/{messageId} {
-    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-    allow delete: if isAdmin();
-  }
-
-  match /exams/{examId} {
-    allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
-    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.creatorId == request.auth.uid);
-  }
-}
-```
-4.  Clique em **Publicar**.
-
-Observação: para que a regra `request.auth.token.admin == true` funcione, o usuário precisa ter um custom claim de administrador configurado no Firebase Authentication.
-
-### 6. Ativar acesso administrativo (custom claims)
-Para que um usuário tenha acesso ao painel administrativo, configure a lista de administradores no ambiente das Functions e chame a Cloud Function de bootstrap:
+Copie `.env.example` para `.env` e preencha os valores públicos de configuração do projeto Firebase. A chave do Gemini deve ficar somente no ambiente das Cloud Functions, sob o parâmetro `GEMINI_API_KEY`; ela nunca deve ser definida como variável `VITE_`.
 
 ```bash
-firebase functions:config:set ADMIN_EMAILS="admin@seu-dominio.com"
+npm run dev
 ```
 
-Depois, em um terminal autenticado com o usuário administrador, execute:
+## Verificação
 
 ```bash
-curl -X POST "https://us-central1-SEU_PROJETO.cloudfunctions.net/grantAdminAccess" \
-  -H "Authorization: Bearer $(firebase auth:print-access-token)" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@seu-dominio.com"}'
+npm run type-check
+npm run lint
+npm run build
+npm --prefix functions run build
 ```
 
-A função só aceita e-mails listados em `ADMIN_EMAILS`. A partir daí, o Firebase terá um custom claim `admin: true` e a rota `/admin` passará a funcionar corretamente.
+As regras de acesso estão em `firestore.rules` e o índice composto do histórico em `firestore.indexes.json`. Teste as regras com o emulador antes de publicar. O frontend depende das funções `generateQuestions`, `submitExamResult`, `grantAdminAccess` e `deleteUserByAdmin`; alterações no frontend e nas funções devem ser implantadas juntas.
 
-### 7. Rodar o Projeto
-Com tudo configurado, inicie o servidor de desenvolvimento:
+## Administração
 
-```bash
-yarn dev
-```
-A aplicação estará disponível em `http://localhost:5173`.
+O acesso administrativo usa a custom claim `admin: true` do Firebase Authentication. Configure `ADMIN_EMAILS` como parâmetro de ambiente das Functions com os endereços autorizados. A função `grantAdminAccess` exige o ID token de um endereço dessa lista e só concede acesso a outro endereço listado. Após receber a claim, o administrador precisa renovar o ID token (por exemplo, entrando novamente).
 
-### 8. Configurar Índices do Firestore
-Algumas consultas no banco de dados (como buscar o histórico de um usuário ordenado por data) exigem índices compostos. 
-
-Se você encontrar o erro `FirebaseError: The query requires an index`, siga estes passos:
-1. Abra o console do navegador (F12).
-2. Localize a mensagem de erro que contém um link (começa com `https://console.firebase.google.com/...`).
-3. Clique no link. Ele levará você diretamente para a página de criação de índices do Firebase com os campos já preenchidos.
-4. Clique em "Create Index". O processo pode levar alguns minutos.
-
-
-## 📂 Estrutura do Projeto
-
-O projeto é organizado de forma modular para facilitar a manutenção e o desenvolvimento de novas funcionalidades.
-
-```
-src/
-├── assets/         # Imagens, ícones e outros recursos estáticos
-├── components/     # Componentes React reutilizáveis
-│   ├── common/     # Componentes genéricos (Loader, Button, etc.)
-│   └── layout/     # Componentes de estrutura (Header, Footer, etc.)
-├── hooks/          # Hooks customizados (ex: useAuth)
-├── pages/          # Componentes que representam as páginas da aplicação
-├── routes/         # Configuração do roteamento (React Router)
-├── services/       # Módulos para interagir com APIs externas (Firebase, etc.)
-├── styles/         # Estilos globais e configuração de tema (Styled Components)
-└── types/          # Definições de tipos e interfaces TypeScript
-```
+Não altere `isUnlocked` ou `generationCount` pelo cliente. O primeiro campo é modificado por administradores; o segundo é reservado de forma transacional pela função de geração. As regras permitem ao usuário editar apenas os campos de perfil.

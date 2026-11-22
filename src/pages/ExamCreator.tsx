@@ -15,8 +15,7 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
-  FormControlLabel,
-  Checkbox
+  ToggleButton, ToggleButtonGroup, Paper, Stack
 } from '@mui/material';
 
 const bancas = [
@@ -36,6 +35,12 @@ const subjects: string[] = [
     "Direito",
     "Outra"
 ];
+
+const contentHash = (value: string): string => {
+  let hash = 0;
+  for (const char of value) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
+  return (hash >>> 0).toString(16);
+};
 
 
 export const ExamCreator: React.FC = () => {
@@ -91,19 +96,13 @@ export const ExamCreator: React.FC = () => {
     try {
       const subjectForApi = useEditalContent ? `Questões sobre o edital: ${finalSubject}` : finalSubject;
       
-      const storageKey = `generatedQuestions_${subjectForApi}_${bancaApi}_${difficulty}`;
+      const storageKey = `generatedQuestions_${auth.currentUser.uid}_${contentHash([subjectForApi, bancaApi, difficulty, specificContent, editalContent].join('|'))}`;
       const existingQuestionsRaw = localStorage.getItem(storageKey);
-      const existingQuestions = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
-
-      console.log("Enviando para a API:", {
-        subjectForApi,
-        numQuestions,
-        bancaApi,
-        difficulty,
-        editalContent: useEditalContent ? editalContent : undefined,
-        specificContent: !useEditalContent ? specificContent : undefined,
-        existingQuestions,
-      });
+      let existingQuestions: { question: string }[] = [];
+      try {
+        const parsed: unknown = existingQuestionsRaw ? JSON.parse(existingQuestionsRaw) : [];
+        if (Array.isArray(parsed)) existingQuestions = (parsed as unknown[]).filter((item): item is { question: string } => typeof item === 'object' && item !== null && 'question' in item && typeof item.question === 'string');
+      } catch { localStorage.removeItem(storageKey); }
 
       const questionsToUse = await generateQuestionsFromBank(
         subjectForApi, 
@@ -115,16 +114,10 @@ export const ExamCreator: React.FC = () => {
         !useEditalContent ? specificContent : undefined
       );
 
-      console.log("Resposta da API:", questionsToUse);
-
-      if (questionsToUse.length === 0 || questionsToUse[0]?.id.startsWith('error-')) {
-        setError(questionsToUse[0]?.question || "Não foi possível gerar questões com os critérios fornecidos. Tente novamente.");
-        setIsLoading(false);
-        return;
-      }
+      if (questionsToUse.length === 0) throw new Error('Nenhuma questão foi gerada. Tente novamente.');
 
       const newQuestionTexts = questionsToUse.map(q => ({ question: q.question }));
-      const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts];
+      const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts].slice(-50);
       localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
       
       const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
@@ -137,7 +130,7 @@ export const ExamCreator: React.FC = () => {
       };
 
       const examId = await createExam(examData);
-      navigate(`/simulado/${examId}`);
+      void navigate(`/simulado/${examId}`);
 
     } catch (err) {
       console.error("Erro ao criar o simulado: ", err);
@@ -153,11 +146,12 @@ export const ExamCreator: React.FC = () => {
       <Typography variant="h4" component="h1" gutterBottom>
         Criar Simulado
       </Typography>
-      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-        <FormControlLabel
-          control={<Checkbox checked={useEditalContent} onChange={(e) => setUseEditalContent(e.target.checked)} />}
-          label="Gerar questões a partir do conteúdo do edital"
-        />
+      <Box component="form" onSubmit={(event) => { void handleSubmit(event); }} sx={{ mt: 3 }}>
+        <Typography fontWeight={700} gutterBottom>Como você quer estudar?</Typography>
+        <ToggleButtonGroup exclusive fullWidth value={useEditalContent ? 'edital' : 'materia'} onChange={(_, value: 'edital' | 'materia' | null) => { if (value) setUseEditalContent(value === 'edital'); }} aria-label="Modo de criação" sx={{ mb: 2 }}>
+          <ToggleButton value="materia">Por matéria</ToggleButton>
+          <ToggleButton value="edital">Por edital</ToggleButton>
+        </ToggleButtonGroup>
 
         {useEditalContent ? (
           <>
@@ -168,7 +162,7 @@ export const ExamCreator: React.FC = () => {
               label="Nome para o Simulado (Edital)"
               value={editalTitle}
               onChange={(e) => setEditalTitle(e.target.value)}
-              placeholder="Ex: Simulado PM-SP 2024"
+              placeholder="Ex: Simulado PM-SP"
               required={useEditalContent}
             />
             <TextField
@@ -183,6 +177,7 @@ export const ExamCreator: React.FC = () => {
               placeholder="Cole aqui a parte do edital com o conteúdo programático."
               required={useEditalContent}
             />
+            <Typography variant="body2" color="text.secondary">O gerador usa até os primeiros 4.000 caracteres do conteúdo colado.</Typography>
           </>
         ) : (
           <>
@@ -257,7 +252,7 @@ export const ExamCreator: React.FC = () => {
             id="difficulty"
             value={difficulty}
             label="Nível de Dificuldade"
-            onChange={(e) => setDifficulty(e.target.value as 'fundamental' | 'medio' | 'superior')}
+            onChange={(e) => setDifficulty(e.target.value)}
           >
             <MenuItem value="fundamental">Nível Fundamental</MenuItem>
             <MenuItem value="medio">Nível Médio</MenuItem>
@@ -265,7 +260,13 @@ export const ExamCreator: React.FC = () => {
           </Select>
         </FormControl>
         
-        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        <Paper variant="outlined" sx={{ p: 2, mt: 3, bgcolor: 'primary.light' }}>
+          <Typography fontWeight={700}>Seu simulado</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 0.5 }}><Typography variant="body2">10 questões</Typography><Typography variant="body2">· Até 60 minutos</Typography><Typography variant="body2">· Até 3 gerações gratuitas por conta</Typography></Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Questões criadas por IA podem conter erros. Confira a explicação e a fonte antes de usá-las como referência oficial.</Typography>
+        </Paper>
+        {isLoading && <Alert severity="info" sx={{ mt: 2 }}>Gerando questões e preparando seu simulado. Isso pode levar alguns instantes.</Alert>}
+        {error && <Alert severity="error" role="alert" sx={{ mt: 2 }}>{error}</Alert>}
 
         <Button
           type="submit"

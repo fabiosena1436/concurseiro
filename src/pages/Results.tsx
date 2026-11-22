@@ -34,7 +34,7 @@ export const Results: React.FC = () => {
       return;
     }
     if (!resultId || !user) {
-      navigate('/');
+      void navigate('/');
       return;
     }
 
@@ -91,6 +91,8 @@ export const Results: React.FC = () => {
     return `${m}m ${s}s`;
   }
 
+  const missedSubjects = [...new Set(result.answers.filter(answer => !answer.isCorrect).map(answer => findQuestionById(answer.questionId)?.subject).filter((subject): subject is string => Boolean(subject)))];
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
@@ -120,6 +122,14 @@ export const Results: React.FC = () => {
         </Grid>
       </Paper>
 
+      <Paper variant="outlined" sx={{ p: 3, mb: 4, bgcolor: 'primary.light' }}>
+        <Typography variant="h6" gutterBottom>Próximo passo de estudo</Typography>
+        <Typography color="text.secondary">
+          {missedSubjects.length ? `Revise as explicações abaixo e pratique novamente: ${missedSubjects.join(', ')}.` : 'Ótimo resultado. Continue praticando para manter a consistência.'}
+        </Typography>
+        <Button component={Link} to="/criar-simulado" variant="contained" sx={{ mt: 2 }}>Criar outro simulado</Button>
+      </Paper>
+
       <Typography variant="h5" component="h2" gutterBottom>
         Relatório Detalhado
       </Typography>
@@ -130,7 +140,7 @@ export const Results: React.FC = () => {
           const question = findQuestionById(answer.questionId);
           if (!question) return null;
 
-          const userAnswerText = answer.selectedAnswer !== undefined ? question.options[answer.selectedAnswer] : "Não respondida";
+          const userAnswerText = answer.selectedAnswer !== null && answer.selectedAnswer !== undefined ? question.options[answer.selectedAnswer] : "Não respondida";
           const correctAnswerText = question.options[question.correctAnswer];
 
           return (
@@ -159,7 +169,7 @@ export const Results: React.FC = () => {
         })}
       </Box>
 
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between' }}>
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
         <Button component={Link} to="/dashboard" variant="outlined">
           Voltar para o Dashboard
         </Button>

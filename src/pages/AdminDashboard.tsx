@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin, deleteSupportMessage } from '../services/firestoreService';
@@ -42,7 +42,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleCloseConfirm = () => setConfirmDialog(prev => ({ ...prev, open: false }));
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [fetchedUsers, fetchedMessages] = await Promise.all([
@@ -65,11 +65,11 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tabIndex]);
 
   useEffect(() => {
     void fetchData();
-  }, [tabIndex]);
+  }, [fetchData]);
 
   const handleToggleUnlock = async (uid: string, currentStatus: boolean) => {
     try {
@@ -86,18 +86,18 @@ export const AdminDashboard: React.FC = () => {
       open: true,
       title: 'Excluir Usuário',
       message: 'Tem certeza que deseja excluir permanentemente este usuário? Esta ação não pode ser desfeita.',
-      onConfirm: async () => {
+      onConfirm: () => { void (async () => {
         handleCloseConfirm();
         try {
           setLoading(true);
           await deleteUserAccount(uid);
           await fetchData();
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error(err);
-          setError(err.message || "Erro ao deletar usuário.");
+          setError(err instanceof Error ? err.message : "Erro ao deletar usuário.");
           setLoading(false);
         }
-      }
+      })(); }
     });
   };
 
@@ -130,7 +130,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteConversation = async (userId: string) => {
+  const deleteConversation = async (userId: string) => {
     try {
       setLoading(true);
       const userMsgs = messages.filter(m => m.userId === userId);
@@ -141,6 +141,15 @@ export const AdminDashboard: React.FC = () => {
       setError("Erro ao excluir conversa.");
       setLoading(false);
     }
+  };
+
+  const handleDeleteConversation = (userId: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Apagar conversa',
+      message: 'Todas as mensagens desta conversa serão apagadas. Esta ação não pode ser desfeita.',
+      onConfirm: () => { handleCloseConfirm(); void deleteConversation(userId); },
+    });
   };
 
   // Process and group all messages by user, flattening legacy replies
@@ -204,7 +213,7 @@ export const AdminDashboard: React.FC = () => {
       </Tabs>
 
       {tabIndex === 0 && (
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
           <Table>
             <TableHead>
               <TableRow>
@@ -228,6 +237,7 @@ export const AdminDashboard: React.FC = () => {
                       checked={!!user.isUnlocked}
                       onChange={() => void handleToggleUnlock(user.uid, !!user.isUnlocked)}
                       color="primary"
+                      inputProps={{ 'aria-label': `Desbloquear ${user.name || user.email}` }}
                     />
                   </TableCell>
                   <TableCell align="center">
@@ -268,10 +278,7 @@ export const AdminDashboard: React.FC = () => {
 
               return (
                 <Paper key={latestMsg.userId} sx={{ mb: 4, bgcolor: '#f8f9fa', overflow: 'hidden' }}>
-                  <Box 
-                    sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', bgcolor: isExpanded ? '#e0e0e0' : 'transparent' }}
-                    onClick={() => toggleThread(latestMsg.userId)}
-                  >
+                  <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, bgcolor: isExpanded ? 'primary.light' : 'transparent' }}>
                     <Box>
                       <Typography variant="h6">
                         {latestMsg.userName} ({latestMsg.userEmail})
@@ -281,17 +288,17 @@ export const AdminDashboard: React.FC = () => {
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <Typography variant="button" color="primary">
+                      <Button onClick={() => toggleThread(latestMsg.userId)} aria-expanded={isExpanded} aria-controls={`thread-${latestMsg.userId}`}>
                         {isExpanded ? "Minimizar" : "Abrir"}
-                      </Typography>
-                      <Button variant="outlined" color="error" size="small" onClick={(e) => { e.stopPropagation(); void handleDeleteConversation(latestMsg.userId); }}>
+                      </Button>
+                      <Button variant="outlined" color="error" size="small" onClick={() => handleDeleteConversation(latestMsg.userId)}>
                         Apagar Conversa
                       </Button>
                     </Box>
                   </Box>
                   
                   {isExpanded && (
-                    <Box sx={{ p: 2, pt: 0 }}>
+                    <Box id={`thread-${latestMsg.userId}`} sx={{ p: 2, pt: 0 }}>
                       <Box sx={{ maxHeight: 400, overflowY: 'auto', p: 1, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: 1, mb: 2, mt: 2 }}>
                         {thread.map((bubble) => (
                           <Box 
@@ -315,9 +322,9 @@ export const AdminDashboard: React.FC = () => {
                                 className="delete-btn"
                                 size="small" 
                                 color="error" 
-                                sx={{ opacity: 0, transition: 'opacity 0.2s', padding: 0, ml: 1 }}
+                                sx={{ padding: 0, ml: 1 }}
                                 onClick={() => void handleDeleteSingleMessage(bubble.id, bubble.isLegacyReply)}
-                                title="Apagar mensagem"
+                                aria-label="Apagar mensagem"
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>

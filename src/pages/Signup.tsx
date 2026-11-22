@@ -20,10 +20,10 @@ export const Signup: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     React.useEffect(() => {
-        if (!loading && user) {
-            navigate('/dashboard');
+        if (!loading && user && !isSubmitting) {
+            void navigate('/dashboard');
         }
-    }, [user, loading, navigate]);
+    }, [user, loading, navigate, isSubmitting]);
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,7 +47,7 @@ export const Signup: React.FC = () => {
                     isUnlocked: false,
                 });
             }
-            navigate('/dashboard');
+            void navigate('/dashboard');
         } catch (err: unknown) {
             if (typeof err === 'object' && err !== null && 'code' in err) {
                 const firebaseError = err as { code: string };

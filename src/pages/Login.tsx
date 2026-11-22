@@ -16,7 +16,7 @@ export const Login: React.FC = () => {
 
     React.useEffect(() => {
         if (!loading && user) {
-            navigate('/dashboard');
+            void navigate('/dashboard');
         }
     }, [user, loading, navigate]);
 
@@ -26,7 +26,7 @@ export const Login: React.FC = () => {
         setError(null);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            navigate('/dashboard');
+            void navigate('/dashboard');
         } catch (err) {
             if (err instanceof Error) {
               setError("Credenciais inválidas. Verifique seu e-mail e senha.");

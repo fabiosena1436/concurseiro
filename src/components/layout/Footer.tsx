@@ -27,7 +27,7 @@ const Footer: React.FC = () => {
         </Box>
         <Typography variant="body2" color="text.secondary" align="center">
           {'Copyright © '}
-          <Link color="inherit" href="#">
+          <Link color="inherit" component={RouterLink} to="/">
             Simulado Concurso
           </Link>{' '}
           {new Date().getFullYear()}

@@ -1,17 +1,21 @@
 import { createBrowserRouter } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import App from "../App";
-import { Home } from "../pages/Home";
-import { Dashboard } from "../pages/Dashboard";
-import { ExamCreator } from "../pages/ExamCreator";
-import { Exam } from "../pages/Exam";
-import { Results } from "../pages/Results";
-import { Login } from "../pages/Login";
-import { Signup } from "../pages/Signup";
 import { ProtectedRoute } from "../components/common/ProtectedRoute";
 import { AdminRoute } from "../components/common/AdminRoute";
-import { About } from "../pages/About";
-import { AdminDashboard } from "../pages/AdminDashboard";
-import { Support } from "../pages/Support";
+import { Loader } from "../components/common/Loader";
+
+const Home = lazy(() => import('../pages/Home').then(module => ({ default: module.Home })));
+const Dashboard = lazy(() => import('../pages/Dashboard').then(module => ({ default: module.Dashboard })));
+const ExamCreator = lazy(() => import('../pages/ExamCreator').then(module => ({ default: module.ExamCreator })));
+const Exam = lazy(() => import('../pages/Exam').then(module => ({ default: module.Exam })));
+const Results = lazy(() => import('../pages/Results').then(module => ({ default: module.Results })));
+const Login = lazy(() => import('../pages/Login').then(module => ({ default: module.Login })));
+const Signup = lazy(() => import('../pages/Signup').then(module => ({ default: module.Signup })));
+const About = lazy(() => import('../pages/About').then(module => ({ default: module.About })));
+const AdminDashboard = lazy(() => import('../pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
+const Support = lazy(() => import('../pages/Support').then(module => ({ default: module.Support })));
+const page = (element: React.ReactNode) => <Suspense fallback={<Loader>Carregando página...</Loader>}>{element}</Suspense>;
 
 export const router = createBrowserRouter([
   {
@@ -20,42 +24,42 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Home />,
+        element: page(<Home />),
       },
       {
         path: "/about",
-        element: <About />,
+        element: page(<About />),
       },
       {
         path: "/login",
-        element: <Login />,
+        element: page(<Login />),
       },
       {
         path: "/signup",
-        element: <Signup />,
+        element: page(<Signup />),
       },
       {
         element: <ProtectedRoute />,
         children: [
           {
             path: "/dashboard",
-            element: <Dashboard />,
+            element: page(<Dashboard />),
           },
           {
             path: "/criar-simulado",
-            element: <ExamCreator />,
+            element: page(<ExamCreator />),
           },
           {
             path: "/simulado/:id",
-            element: <Exam />,
+            element: page(<Exam />),
           },
           {
             path: "/resultados/:id",
-            element: <Results />,
+            element: page(<Results />),
           },
           {
             path: "/suporte",
-            element: <Support />,
+            element: page(<Support />),
           },
         ]
       },
@@ -64,7 +68,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: "/admin",
-            element: <AdminDashboard />,
+            element: page(<AdminDashboard />),
           }
         ]
       }

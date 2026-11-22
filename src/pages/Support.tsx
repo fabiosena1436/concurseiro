@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Typography, Box, TextField, Button, Paper, CircularProgress, Alert, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../hooks/useAuth';
@@ -22,7 +22,7 @@ export const Support: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!user) return;
     try {
       const data = await getUserMessages(user.uid);
@@ -42,11 +42,11 @@ export const Support: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     void fetchMessages();
-  }, [user]);
+  }, [fetchMessages]);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -124,10 +124,7 @@ export const Support: React.FC = () => {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Paper sx={{ mb: 4, bgcolor: '#f8f9fa', overflow: 'hidden' }}>
-        <Box 
-          sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', bgcolor: isExpanded ? '#e0e0e0' : 'transparent' }}
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: isExpanded ? 'primary.light' : 'transparent' }}>
           <Box>
             <Typography variant="h6">
               Sua Conversa
@@ -138,13 +135,13 @@ export const Support: React.FC = () => {
               </Typography>
             )}
           </Box>
-          <Typography variant="button" color="primary">
+          <Button onClick={() => setIsExpanded(!isExpanded)} aria-expanded={isExpanded} aria-controls="support-conversation">
             {isExpanded ? "Minimizar" : "Abrir"}
-          </Typography>
+          </Button>
         </Box>
 
         {isExpanded && (
-          <Box sx={{ p: 2 }}>
+          <Box id="support-conversation" sx={{ p: 2 }}>
             <Box sx={{ height: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, mb: 2, bgcolor: '#ffffff', p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
               {chatBubbles.length === 0 ? (
                 <Typography color="text.secondary" align="center" sx={{ mt: 2 }}>Nenhuma mensagem encontrada. Envie sua primeira dúvida abaixo.</Typography>
@@ -172,9 +169,9 @@ export const Support: React.FC = () => {
                         className="delete-btn"
                         size="small" 
                         color="error" 
-                        sx={{ opacity: 0, transition: 'opacity 0.2s', padding: 0, ml: 1 }}
+                        sx={{ padding: 0, ml: 1 }}
                         onClick={() => void handleDeleteSingleMessage(bubble.id, bubble.isLegacyReply)}
-                        title="Apagar mensagem"
+                        aria-label="Apagar mensagem"
                       >
                         <DeleteIcon fontSize="small" />
                       </IconButton>

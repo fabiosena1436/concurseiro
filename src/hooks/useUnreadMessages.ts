@@ -10,8 +10,6 @@ export const useUnreadMessages = () => {
 
   useEffect(() => {
     if (!user) {
-      setUnreadCount(0);
-      setAdminUnreadCount(0);
       return;
     }
 
@@ -23,7 +21,7 @@ export const useUnreadMessages = () => {
     const unsubscribeUser = onSnapshot(userQuery, (snapshot) => {
       const count = snapshot.docs.filter(doc => {
         const data = doc.data();
-        return data.isReadByUser === false && data.reply;
+        return data.isReadByUser === false && (data.sender === 'admin' || Boolean(data.reply));
       }).length;
       setUnreadCount(count);
     });
@@ -46,5 +44,5 @@ export const useUnreadMessages = () => {
     };
   }, [user, isAdmin]);
 
-  return { unreadCount, adminUnreadCount };
+  return { unreadCount: user ? unreadCount : 0, adminUnreadCount: user && isAdmin ? adminUnreadCount : 0 };
 };

@@ -1,44 +1,55 @@
-﻿rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
-  function isSignedIn() {
-    return request.auth != null;
-  }
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function admin() { return signedIn() && request.auth.token.admin == true; }
 
-  function isOwner(uid) {
-    return isSignedIn() && request.auth.uid == uid;
-  }
+    match /users/{uid} {
+      allow read: if owner(uid) || admin();
+      allow create: if owner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.generationCount == 0
+        && request.resource.data.isUnlocked == false
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'socialName', 'phone', 'email', 'generationCount', 'isUnlocked'])
+        && request.resource.data.keys().hasAll(['uid', 'name', 'socialName', 'phone', 'email', 'generationCount', 'isUnlocked']);
+      allow update: if (owner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'socialName', 'phone']))
+        || (admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isUnlocked']));
+      allow delete: if admin();
+    }
 
-  function isAdmin() {
-    return isSignedIn() && request.auth.token.admin == true;
-  }
+    match /results/{resultId} {
+      allow create: if false;
+      allow read, delete: if admin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if false;
+    }
 
-  match /users/{uid} {
-    allow read: if isOwner(uid) || isAdmin();
-    allow create: if isOwner(uid)
-      && request.resource.data.uid == uid
-      && request.resource.data.email == request.auth.token.email;
-    allow update: if isOwner(uid)
-      && request.resource.data.uid == uid
-      && request.resource.data.email == request.auth.token.email;
-    allow delete: if isAdmin();
-  }
+    match /messages/{messageId} {
+      allow create: if (owner(request.resource.data.userId)
+          && request.resource.data.sender == 'user'
+          && request.resource.data.isReadByAdmin == false
+          && request.resource.data.isReadByUser == true)
+        || (admin()
+          && request.resource.data.sender == 'admin'
+          && request.resource.data.isReadByAdmin == true
+          && request.resource.data.isReadByUser == false);
+      allow read: if admin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if (admin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReadByAdmin']))
+        || (signedIn() && resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReadByUser']));
+      allow delete: if admin() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
 
-  match /results/{resultId} {
-    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-  }
-
-  match /messages/{messageId} {
-    allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-    allow delete: if isAdmin();
-  }
-
-  match /exams/{examId} {
-    allow create: if isSignedIn() && request.resource.data.creatorId == request.auth.uid;
-    allow read: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
-    allow update, delete: if isAdmin() || (isSignedIn() && resource.data.creatorId == request.auth.uid);
+    match /exams/{examId} {
+      allow create: if owner(request.resource.data.creatorId);
+      allow read, delete: if admin() || (signedIn() && resource.data.creatorId == request.auth.uid);
+      allow update: if false;
+    }
   }
 }

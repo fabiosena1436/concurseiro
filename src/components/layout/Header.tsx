@@ -17,7 +17,7 @@ export const Header: React.FC = () => {
 
   const handleLogout = async () => {
     await auth.signOut();
-    navigate('/');
+    void navigate('/');
   }
 
   const handleDrawerToggle = () => {
@@ -87,7 +87,7 @@ export const Header: React.FC = () => {
           <>
             <IconButton
               color="inherit"
-              aria-label="open drawer"
+              aria-label="Abrir menu"
               edge="start"
               onClick={handleDrawerToggle}
             >
@@ -100,9 +100,8 @@ export const Header: React.FC = () => {
             >
               <Box
                 sx={{ width: 250 }}
-                role="presentation"
-                onClick={handleDrawerToggle}
-                onKeyDown={handleDrawerToggle}
+                component="nav"
+                aria-label="Menu principal"
               >
                 <List>
                   {menuItems}
@@ -142,7 +141,7 @@ export const Header: React.FC = () => {
             </Button>
             {user ? (
               <>
-                <Button color="inherit">{userData?.socialName || user.email}</Button>
+                <Typography component="span" sx={{ mx: 1, fontSize: 14 }}>{userData?.socialName || user.email}</Typography>
                 <Button color="inherit" onClick={() => void handleLogout()}>
                   Sair
                 </Button>

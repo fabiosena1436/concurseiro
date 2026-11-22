@@ -18,7 +18,7 @@ export type Exam = {
 
 export type UserAnswer = {
   questionId: string;
-  selectedAnswer: number;
+  selectedAnswer: number | null;
   isCorrect: boolean;
 };
 

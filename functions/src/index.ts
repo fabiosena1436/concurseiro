@@ -207,22 +207,6 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     const uid = decodedToken.uid;
     const userDocRef = admin.firestore().collection("users").doc(uid);
 
-    try {
-      const userDoc = await userDocRef.get();
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        const generationCount = userData?.generationCount || 0;
-        const isUnlocked = userData?.isUnlocked || false;
-
-        if (!isUnlocked && generationCount >= 3) {
-          response.status(403).send({ error: { message: "Você atingiu o limite de 3 simulados gerados. Para continuar testando ou ter acesso ilimitado, entre em contato via e-mail e realize o pagamento de R$30,00 para desbloqueio da sua conta.", status: "PERMISSION_DENIED", isLimitReached: true } });
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-    }
-
     // 3. USANDO OS PARÂMETROS EM TEMPO DE EXECUÇÃO
     const apiKey = geminiApiKey.value();
     const modelStr = geminiModelStr.value();
@@ -242,16 +226,41 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       systemInstruction: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
     });
 
-    const data = request.body.data;
+    const data = request.body?.data || {};
     const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data;
 
-    if (!subject || !numQuestions || !banca || !difficulty) {
+    if (typeof subject !== 'string' || !subject.trim() || subject.length > 150 || numQuestions !== 10 || typeof banca !== 'string' || banca.length > 100 || !['fundamental', 'medio', 'superior'].includes(difficulty) || (editalContent !== undefined && typeof editalContent !== 'string') || (specificContent !== undefined && typeof specificContent !== 'string')) {
       response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
       return;
     }
 
+    let reserved = false;
+    let succeeded = false;
     try {
-      const prompt = createPrompt({ subject, numQuestions, banca, difficulty, editalContent, specificContent, existingQuestions });
+      const allowed = await admin.firestore().runTransaction(async transaction => {
+        reserved = false;
+        const profile = await transaction.get(userDocRef);
+        if (!profile.exists) return false;
+        if (profile.data()?.isUnlocked === true) return true;
+        if ((profile.data()?.generationCount ?? 0) >= 3) return false;
+        transaction.update(userDocRef, { generationCount: admin.firestore.FieldValue.increment(1) });
+        reserved = true;
+        return true;
+      });
+      if (!allowed) {
+        response.status(403).send({ error: { message: 'Limite gratuito atingido ou perfil não encontrado. Entre em contato pelo suporte para continuar.', status: 'PERMISSION_DENIED' } });
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to reserve generation:', error);
+      response.status(500).send({ error: { message: 'Não foi possível verificar seu limite de uso.' } });
+      return;
+    }
+
+    try {
+      const safeExistingQuestions = Array.isArray(existingQuestions) ? existingQuestions.slice(-30).filter((item: any) => typeof item?.question === 'string').map((item: any) => ({ question: item.question.slice(0, 300) })) : [];
+      const safeBanca = Object.prototype.hasOwnProperty.call(bancaProfiles, banca) ? banca as keyof typeof bancaProfiles : 'Outra';
+      const prompt = createPrompt({ subject, numQuestions, banca: safeBanca, difficulty, editalContent, specificContent: specificContent?.slice(0, 500), existingQuestions: safeExistingQuestions });
       
       const result = await model.generateContent(prompt);
       const responseContent = result.response.text();
@@ -266,12 +275,12 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
         responseObject = JSON.parse(responseContent);
       } catch (parseError) {
         console.error("Error parsing JSON from Gemini:", { response: responseContent, error: parseError });
-        response.status(500).send({ error: { message: "A resposta da IA não é um JSON válido.", status: "INTERNAL", details: { originalResponse: responseContent } } });
+        response.status(500).send({ error: { message: "A resposta da IA não é um JSON válido.", status: "INTERNAL" } });
         return;
       }
 
       const questionsArray = responseObject.questions;
-      if (!Array.isArray(questionsArray)) {
+      if (!Array.isArray(questionsArray) || questionsArray.length !== 10 || questionsArray.some((q: any) => typeof q?.question !== 'string' || !Array.isArray(q.options) || q.options.length < 2 || q.options.some((option: any) => typeof option !== 'string') || !Number.isInteger(q.correctAnswer) || q.correctAnswer < 0 || q.correctAnswer >= q.options.length)) {
         response.status(500).send({ error: { message: "A resposta da IA não contém um array 'questions'.", status: "INTERNAL" } });
         return;
       }
@@ -282,19 +291,12 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
         subject: subject,
       }));
 
-      // Incrementa a contagem do usuário após sucesso
-      try {
-        await userDocRef.set({ generationCount: admin.firestore.FieldValue.increment(1) }, { merge: true });
-      } catch (error) {
-        console.error("Error incrementing generationCount:", error);
-      }
-
+      succeeded = true;
       response.status(200).send({ data: allQuestions });
 
     } catch (error: any) {
       console.error("Error calling Gemini API or processing data:", {
         errorMessage: error.message,
-        requestData: data,
       });
 
       let friendlyMessage = "Ocorreu um erro interno ao chamar a API da IA.";
@@ -314,7 +316,64 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
         }
       }
 
-      response.status(httpStatus).send({ error: { message: friendlyMessage, status: statusString, details: { originalError: error.message } } });
+      response.status(httpStatus).send({ error: { message: friendlyMessage, status: statusString } });
+    } finally {
+      if (reserved && !succeeded) {
+        await userDocRef.update({ generationCount: admin.firestore.FieldValue.increment(-1) }).catch(error => console.error('Failed to restore generation quota:', error));
+      }
+    }
+  });
+});
+
+export const submitExamResult = onRequest({ timeoutSeconds: 60 }, (request, response) => {
+  corsHandler(request, response, async () => {
+    if (request.method !== 'POST') {
+      response.status(405).send({ error: { message: 'Method Not Allowed' } });
+      return;
+    }
+    const token = request.headers.authorization?.split('Bearer ')[1];
+    if (!token) {
+      response.status(401).send({ error: { message: 'Authentication required' } });
+      return;
+    }
+    let caller;
+    try {
+      caller = await admin.auth().verifyIdToken(token);
+    } catch {
+      response.status(401).send({ error: { message: 'Invalid authentication token' } });
+      return;
+    }
+    try {
+      const { examId, answers, timeTaken } = request.body?.data || {};
+      if (typeof examId !== 'string' || !Array.isArray(answers) || answers.length > 100 || !Number.isFinite(timeTaken) || timeTaken < 0) {
+        response.status(400).send({ error: { message: 'Invalid result data' } });
+        return;
+      }
+      const examDoc = await admin.firestore().collection('exams').doc(examId).get();
+      const exam = examDoc.data();
+      if (!examDoc.exists || exam?.creatorId !== caller.uid || !Array.isArray(exam.questions) || exam.questions.length === 0) {
+        response.status(403).send({ error: { message: 'Exam unavailable' } });
+        return;
+      }
+      const supplied = new Map<string, unknown>(answers.map((answer: any) => [answer?.questionId, answer?.selectedAnswer]));
+      const checkedAnswers = exam.questions.map((question: any) => {
+        const selected = supplied.get(question.id);
+        const selectedAnswer = typeof selected === 'number' && Number.isInteger(selected) && selected >= 0 && selected < question.options.length ? selected : null;
+        return { questionId: question.id, selectedAnswer, isCorrect: selectedAnswer === question.correctAnswer };
+      });
+      const score = Math.round((checkedAnswers.filter((answer: any) => answer.isCorrect).length / checkedAnswers.length) * 10000) / 100;
+      const result = await admin.firestore().collection('results').add({
+        userId: caller.uid,
+        examId,
+        answers: checkedAnswers,
+        score,
+        timeTaken: Math.min(Math.floor(timeTaken), 3600),
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      response.status(200).send({ data: { resultId: result.id } });
+    } catch (error) {
+      console.error('Failed to save exam result:', error);
+      response.status(500).send({ error: { message: 'Could not save result' } });
     }
   });
 });
@@ -334,6 +393,10 @@ export const grantAdminAccess = onRequest({ timeoutSeconds: 60 }, (request, resp
     const targetEmail = (request.body?.email || request.body?.data?.email || '').trim();
     if (!targetEmail) {
       response.status(400).send({ error: { message: "email is required." } });
+      return;
+    }
+    if (!getAllowedAdminEmails().has(targetEmail.toLowerCase())) {
+      response.status(403).send({ error: { message: 'Target email is not in ADMIN_EMAILS.' } });
       return;
     }
 
