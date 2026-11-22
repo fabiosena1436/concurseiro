@@ -50,12 +50,12 @@ No projeto Firebase `simulado-concurso-ia`, crie ou edite o arquivo ignorado `fu
 ```dotenv
 GEMINI_API_KEY="sua_chave_gemini_existente"
 GEMINI_MODEL="gemini-2.5-flash"
-GROQ_API_KEY="sua_chave_groq"
-OPENROUTER_API_KEY="sua_chave_openrouter"
+GROQ_API_KEY="disabled"
+OPENROUTER_API_KEY="disabled"
 ADMIN_EMAILS="seu_email_administrativo"
 ```
 
-Preencha somente as chaves que já possui, preservando `GEMINI_API_KEY` e `ADMIN_EMAILS` existentes. Não compartilhe o arquivo nem cole chaves em conversas ou no Git. Depois de salvar, execute `firebase deploy --only functions --project simulado-concurso-ia` e entre no painel **Admin → IA** para selecionar a chave configurada. Uma chave nova exige novo deploy das Functions. Se for necessário manter chaves fora das variáveis de ambiente, migre esses parâmetros para o Secret Manager do Firebase antes de usá-los em equipe.
+Substitua `disabled` pela chave correspondente quando a criar, preservando `GEMINI_API_KEY` e `ADMIN_EMAILS` existentes. Não compartilhe o arquivo nem cole chaves em conversas ou no Git. Depois de salvar, execute `firebase deploy --only functions --project simulado-concurso-ia` e entre no painel **Admin → IA** para selecionar a chave configurada. Uma chave nova exige novo deploy das Functions. Se for necessário manter chaves fora das variáveis de ambiente, migre esses parâmetros para o Secret Manager do Firebase antes de usá-los em equipe.
 
 ## Administração
 
