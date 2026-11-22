@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton } from '@mui/material';
+import { Container, Typography, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Button, Switch, CircularProgress, Alert, Tabs, Tab, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { getAllUsers, toggleUserUnlockStatus, getAllMessages, replySupportMessage, markMessageAsReadByAdmin, deleteSupportMessage } from '../services/firestoreService';
 import { deleteUserAccount } from '../services/adminService';
+import { getAiSettings, selectAiProvider, type AiProvider, type AiSettings } from '../services/aiAdminService';
 import type { UserProfile } from '../types/user';
 import type { SupportMessage } from '../types/message';
 
@@ -24,6 +25,8 @@ export const AdminDashboard: React.FC = () => {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [expandedThreads, setExpandedThreads] = useState<{ [key: string]: boolean }>({});
   
@@ -70,6 +73,30 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      void getAiSettings().then(settings => { if (active) setAiSettings(settings); }).catch(err => {
+        if (active) setError(err instanceof Error ? err.message : 'Erro ao consultar a IA.');
+      });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 60000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, []);
+
+  const handleAiChange = async (provider: AiProvider) => {
+    setAiBusy(true);
+    setError(null);
+    try {
+      setAiSettings(await selectAiProvider(provider));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao trocar a IA.');
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const handleToggleUnlock = async (uid: string, currentStatus: boolean) => {
     try {
@@ -206,10 +233,14 @@ export const AdminDashboard: React.FC = () => {
       </Typography>
       
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {aiSettings?.quotaAlert && <Alert severity="warning" sx={{ mb: 2 }}>
+        A API {aiSettings.quotaAlert.provider} atingiu a cota em {aiSettings.quotaAlert.detectedAt ? new Date(aiSettings.quotaAlert.detectedAt).toLocaleString('pt-BR') : 'uma geração recente'}. Selecione outra IA configurada na aba IA.
+      </Alert>}
 
       <Tabs value={tabIndex} onChange={(_, newValue) => setTabIndex(newValue as number)} sx={{ mb: 3 }}>
         <Tab label="Usuários" />
         <Tab label="Mensagens" />
+        <Tab label="IA" />
       </Tabs>
 
       {tabIndex === 0 && (
@@ -260,6 +291,26 @@ export const AdminDashboard: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+
+      {tabIndex === 2 && (
+        <Paper sx={{ p: 3, maxWidth: 680 }}>
+          <Typography variant="h6" gutterBottom>Provedor de questões</Typography>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            A troca é manual. Quando a API ativa responder que a cota acabou, o aviso aparece aqui; a geração do estudante é devolvida.
+          </Typography>
+          {aiSettings ? <FormControl fullWidth>
+            <InputLabel id="ai-provider-label">IA ativa</InputLabel>
+            <Select labelId="ai-provider-label" label="IA ativa" value={aiSettings.activeProvider} disabled={aiBusy} onChange={event => { void handleAiChange(event.target.value as AiProvider); }}>
+              <MenuItem value="gemini" disabled={!aiSettings.configured.gemini}>Gemini {aiSettings.configured.gemini ? '' : '(sem chave)'}</MenuItem>
+              <MenuItem value="groq" disabled={!aiSettings.configured.groq}>Groq {aiSettings.configured.groq ? '' : '(sem chave)'}</MenuItem>
+              <MenuItem value="openrouter" disabled={!aiSettings.configured.openrouter}>OpenRouter Free {aiSettings.configured.openrouter ? '' : '(sem chave)'}</MenuItem>
+            </Select>
+          </FormControl> : <CircularProgress size={24} />}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Cadastre as chaves no ambiente das Cloud Functions. Elas não são exibidas neste painel.
+          </Typography>
+        </Paper>
       )}
 
       {tabIndex === 1 && (

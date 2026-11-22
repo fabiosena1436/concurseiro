@@ -3,12 +3,33 @@ import {defineString} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cors from "cors";
+import {AiProvider, AiProviderError, generateWithChatApi, isAiProvider} from "./aiProviders";
 
 // 1. DEFINIÇÃO DE PARÂMETROS
 // Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)
 const geminiApiKey = defineString("GEMINI_API_KEY");
 const geminiModelStr = defineString("GEMINI_MODEL", {default: "gemini-2.5-flash"});
+const groqApiKey = defineString("GROQ_API_KEY", {default: "disabled"});
+const openrouterApiKey = defineString("OPENROUTER_API_KEY", {default: "disabled"});
 const adminEmailsConfig = defineString("ADMIN_EMAILS", { default: "" });
+const aiSettingsRef = () => admin.firestore().collection("systemSettings").doc("ai");
+
+const getProviderKey = (provider: AiProvider): string => {
+  if (provider === "groq") return groqApiKey.value() === "disabled" ? "" : groqApiKey.value();
+  if (provider === "openrouter") return openrouterApiKey.value() === "disabled" ? "" : openrouterApiKey.value();
+  return geminiApiKey.value();
+};
+
+const getActiveProvider = async (): Promise<AiProvider> => {
+  const provider: unknown = (await aiSettingsRef().get()).data()?.activeProvider;
+  return isAiProvider(provider) ? provider : "gemini";
+};
+
+const recordQuotaAlert = async (provider: AiProvider): Promise<void> => {
+  await aiSettingsRef().set({
+    quotaAlert: {provider, detectedAt: admin.firestore.FieldValue.serverTimestamp()},
+  }, {merge: true});
+};
 
 // 2. CONFIGURAÇÃO DO CORS
 // Lista de origens permitidas. Adicione a URL do seu app em produção aqui.
@@ -190,6 +211,10 @@ const createPrompt = (data: {
 
 export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, response) => {
   corsHandler(request, response, async () => {
+    if (request.method !== "POST") {
+      response.status(405).send({error: {message: "Method Not Allowed"}});
+      return;
+    }
     const idToken = request.headers.authorization?.split("Bearer ")[1];
     if (!idToken) {
       response.status(401).send({ error: { message: "Unauthorized. No token provided.", status: "UNAUTHENTICATED" } });
@@ -208,25 +233,22 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     const uid = decodedToken.uid;
     const userDocRef = admin.firestore().collection("users").doc(uid);
 
-    // 3. USANDO OS PARÂMETROS EM TEMPO DE EXECUÇÃO
-    const apiKey = geminiApiKey.value();
-    const modelStr = geminiModelStr.value();
+    let provider: AiProvider;
+    try {
+      provider = await getActiveProvider();
+    } catch (error) {
+      console.error("Failed to read active AI provider:", error);
+      response.status(503).send({error: {message: "Não foi possível verificar a IA ativa."}});
+      return;
+    }
+    const apiKey = getProviderKey(provider);
 
     if (!apiKey) {
-      console.error("A chave da API do Gemini não foi configurada. Execute 'firebase functions:config:set GEMINI_API_KEY=sua_chave'");
+      console.error(`A chave da API ${provider} não foi configurada.`);
       response.status(500).send({ error: { message: "A chave da API da IA não está configurada no servidor.", status: "FAILED_PRECONDITION" } });
       return;
     }
     
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: modelStr,
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-      systemInstruction: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Sua única função é gerar um objeto JSON válido seguindo as regras estritas do usuário. Não adicione nenhum texto ou formatação fora do JSON."
-    });
-
     const data = request.body?.data || {};
     const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data;
 
@@ -263,8 +285,17 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       const safeBanca = Object.prototype.hasOwnProperty.call(bancaProfiles, banca) ? banca as keyof typeof bancaProfiles : 'Outra';
       const prompt = createPrompt({ subject, numQuestions, banca: safeBanca, difficulty, editalContent, specificContent: specificContent?.slice(0, 500), existingQuestions: safeExistingQuestions });
       
-      const result = await model.generateContent(prompt);
-      const responseContent = result.response.text();
+      let responseContent: string;
+      if (provider === "gemini") {
+        const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
+          model: geminiModelStr.value(),
+          generationConfig: {responseMimeType: "application/json"},
+          systemInstruction: "Você é um assistente especialista em criar questões de concursos públicos brasileiros. Responda somente com um objeto JSON válido seguindo as regras do usuário.",
+        });
+        responseContent = (await model.generateContent(prompt)).response.text();
+      } else {
+        responseContent = await generateWithChatApi(provider, apiKey, prompt);
+      }
 
       if (!responseContent) {
         response.status(500).send({ error: { message: "A resposta da IA está vazia ou nula.", status: "INTERNAL" } });
@@ -275,13 +306,13 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       try {
         responseObject = JSON.parse(responseContent);
       } catch (parseError) {
-        console.error("Error parsing JSON from Gemini:", { response: responseContent, error: parseError });
+        console.error(`Error parsing JSON from ${provider}:`, parseError);
         response.status(500).send({ error: { message: "A resposta da IA não é um JSON válido.", status: "INTERNAL" } });
         return;
       }
 
       const questionsArray = responseObject.questions;
-      if (!Array.isArray(questionsArray) || questionsArray.length !== 10 || questionsArray.some((q: any) => typeof q?.question !== 'string' || !Array.isArray(q.options) || q.options.length < 2 || q.options.some((option: any) => typeof option !== 'string') || !Number.isInteger(q.correctAnswer) || q.correctAnswer < 0 || q.correctAnswer >= q.options.length)) {
+      if (!Array.isArray(questionsArray) || questionsArray.length !== 10 || questionsArray.some((q: any) => typeof q?.question !== 'string' || !Array.isArray(q.options) || q.options.length !== (safeBanca === "Cespe/Cebraspe" ? 2 : 5) || q.options.some((option: any) => typeof option !== 'string' || !option.trim()) || !Number.isInteger(q.correctAnswer) || q.correctAnswer < 0 || q.correctAnswer >= q.options.length || typeof q.explanation !== 'string' || !q.explanation.trim())) {
         response.status(500).send({ error: { message: "A resposta da IA não contém um array 'questions'.", status: "INTERNAL" } });
         return;
       }
@@ -296,7 +327,7 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       response.status(200).send({ data: allQuestions });
 
     } catch (error: any) {
-      console.error("Error calling Gemini API or processing data:", {
+      console.error(`Error calling ${provider} API or processing data:`, {
         errorMessage: error.message,
       });
 
@@ -304,17 +335,25 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       let statusString = "INTERNAL";
       let httpStatus = 500;
 
-      if (error.message) {
+      if (error instanceof AiProviderError && error.statusCode === 429) {
+        friendlyMessage = "A cota da IA ativa acabou. O administrador foi avisado e pode selecionar outra IA gratuita.";
+        statusString = "RESOURCE_EXHAUSTED";
+        httpStatus = 429;
+      } else if (error.message) {
         const msgLower = error.message.toLowerCase();
         if (msgLower.includes("503") || msgLower.includes("high demand") || msgLower.includes("overloaded")) {
           friendlyMessage = "A inteligência artificial está com alta demanda no momento. Por favor, aguarde alguns segundos e tente novamente.";
           statusString = "UNAVAILABLE";
           httpStatus = 503;
         } else if (msgLower.includes("429") || msgLower.includes("quota") || msgLower.includes("too many requests")) {
-          friendlyMessage = "O limite de uso gratuito da API foi atingido. Por favor, tente novamente em alguns minutos.";
+          friendlyMessage = "A cota da IA ativa acabou. O administrador foi avisado e pode selecionar outra IA gratuita.";
           statusString = "RESOURCE_EXHAUSTED";
           httpStatus = 429;
         }
+      }
+
+      if (httpStatus === 429) {
+        await recordQuotaAlert(provider).catch(alertError => console.error("Failed to record AI quota alert:", alertError));
       }
 
       response.status(httpStatus).send({ error: { message: friendlyMessage, status: statusString } });
@@ -322,6 +361,54 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
       if (reserved && !succeeded) {
         await userDocRef.update({ generationCount: admin.firestore.FieldValue.increment(-1) }).catch(error => console.error('Failed to restore generation quota:', error));
       }
+    }
+  });
+});
+
+export const manageAiProvider = onRequest({timeoutSeconds: 60}, (request, response) => {
+  corsHandler(request, response, async () => {
+    if (request.method !== "GET" && request.method !== "POST") {
+      response.status(405).send({error: {message: "Method Not Allowed"}});
+      return;
+    }
+    const caller = await requireAdminToken(request, response);
+    if (!caller) return;
+
+    try {
+      if (request.method === "POST") {
+        const selected: unknown = request.body?.data?.provider;
+        if (!isAiProvider(selected)) {
+          response.status(400).send({error: {message: "Provedor inválido."}});
+          return;
+        }
+        if (!getProviderKey(selected)) {
+          response.status(412).send({error: {message: "Cadastre a chave deste provedor no servidor antes de ativá-lo."}});
+          return;
+        }
+        await aiSettingsRef().set({
+          activeProvider: selected,
+          quotaAlert: admin.firestore.FieldValue.delete(),
+          changedAt: admin.firestore.FieldValue.serverTimestamp(),
+          changedBy: caller.uid,
+        }, {merge: true});
+      }
+      const settings = (await aiSettingsRef().get()).data();
+      const alert = settings?.quotaAlert;
+      response.status(200).send({data: {
+        activeProvider: isAiProvider(settings?.activeProvider) ? settings.activeProvider : "gemini",
+        configured: {
+          gemini: Boolean(geminiApiKey.value()),
+          groq: Boolean(getProviderKey("groq")),
+          openrouter: Boolean(getProviderKey("openrouter")),
+        },
+        quotaAlert: isAiProvider(alert?.provider) ? {
+          provider: alert.provider,
+          detectedAt: alert.detectedAt?.toDate?.().toISOString() ?? null,
+        } : null,
+      }});
+    } catch (error) {
+      console.error("Failed to manage AI provider:", error);
+      response.status(500).send({error: {message: "Não foi possível carregar as configurações da IA."}});
     }
   });
 });
