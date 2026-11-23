@@ -24,9 +24,11 @@ export const Home = () => {
                 Prepare-se para o próximo concurso com mais foco.
               </Typography>
               <Typography variant="h6" sx={{ opacity: 0.92, maxWidth: 640, mb: 4, fontWeight: 400 }}>
-                Crie simulados de 10 questões por matéria ou edital, pratique e entenda onde melhorar. As questões são geradas por inteligência artificial e devem ser conferidas antes de uso como referência oficial.
+                Encontre provas anteriores em PDF, estude questões revisadas e acompanhe seus treinos. Você também pode criar simulados separados com inteligência artificial.
               </Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Button component={Link} to="/provas" variant="contained" size="large" sx={{ bgcolor: 'white', color: 'primary.dark' }}>Explorar provas</Button>
+                <Button component={Link} to="/questoes" variant="outlined" size="large" sx={{color: 'white', borderColor: 'white'}}>Buscar questões</Button>
                 <Button component={Link} to={user ? '/criar-simulado' : '/signup'} variant="contained" size="large" sx={{ bgcolor: 'white', color: 'primary.dark', '&:hover': { bgcolor: '#e8efff' } }}>
                   {user ? 'Criar meu simulado' : 'Começar gratuitamente'}
                 </Button>
@@ -34,7 +36,7 @@ export const Home = () => {
                   {user ? 'Ver meu desempenho' : 'Como funciona'}
                 </Button>
               </Stack>
-              <Typography variant="body2" sx={{ mt: 3, opacity: 0.85 }}>Até 3 gerações gratuitas por conta. O desbloqueio é solicitado pelo suporte.</Typography>
+              <Typography variant="body2" sx={{ mt: 3, opacity: 0.85 }}>Simulados gerados por IA são um recurso separado das questões revisadas. Até 3 gerações gratuitas por conta.</Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 5 }}>
               <Card sx={{ p: { xs: 1, md: 2 }, boxShadow: '0 28px 65px #061b4b55' }}>

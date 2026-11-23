@@ -17,7 +17,8 @@ const endpoints = {
 export const generateWithChatApi = async (
   provider: "groq" | "openrouter",
   apiKey: string,
-  prompt: string
+  prompt: string,
+  systemInstruction = 'Crie questões de concursos públicos brasileiros. Responda somente com um objeto JSON válido com a chave questions, sem Markdown.'
 ): Promise<string> => {
   const {url, model} = endpoints[provider];
   const result = await fetch(url, {
@@ -30,7 +31,7 @@ export const generateWithChatApi = async (
     body: JSON.stringify({
       model,
       messages: [
-        {role: "system", content: "Crie questões de concursos públicos brasileiros. Responda somente com um objeto JSON válido com a chave questions, sem Markdown."},
+        {role: "system", content: systemInstruction},
         {role: "user", content: prompt},
       ],
       max_completion_tokens: 4096,

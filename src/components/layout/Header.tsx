@@ -12,7 +12,7 @@ export const Header: React.FC = () => {
   const { unreadCount, adminUnreadCount } = useUnreadMessages();
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('xl'));
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -32,11 +32,14 @@ export const Header: React.FC = () => {
       <ListItemButton component={Link} to="/about" onClick={handleDrawerToggle}>
         <ListItemText primary="Sobre" />
       </ListItemButton>
+      <ListItemButton component={Link} to="/provas" onClick={handleDrawerToggle}><ListItemText primary="Provas anteriores" /></ListItemButton>
+      <ListItemButton component={Link} to="/questoes" onClick={handleDrawerToggle}><ListItemText primary="Banco de questões" /></ListItemButton>
       {user && (
         <>
           <ListItemButton component={Link} to="/dashboard" onClick={handleDrawerToggle}>
             <ListItemText primary="Dashboard" />
           </ListItemButton>
+          <ListItemButton component={Link} to="/treinos" onClick={handleDrawerToggle}><ListItemText primary="Meus treinos" /></ListItemButton>
           <ListItemButton component={Link} to="/suporte" onClick={handleDrawerToggle}>
             <ListItemText primary={
               <Badge badgeContent={unreadCount} color="error" sx={{ '& .MuiBadge-badge': { right: -15, top: 10 } }}>
@@ -44,6 +47,9 @@ export const Header: React.FC = () => {
               </Badge>
             } />
           </ListItemButton>
+          {isAdmin && (
+            <ListItemButton component={Link} to="/admin/acervo" onClick={handleDrawerToggle}><ListItemText primary="Gerenciar acervo" /></ListItemButton>
+          )}
           {isAdmin && (
             <ListItemButton component={Link} to="/admin" onClick={handleDrawerToggle}>
               <ListItemText primary={
@@ -80,7 +86,7 @@ export const Header: React.FC = () => {
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            Simulado Concurso
+            Concurseiro
           </Link>
         </Typography>
         {isMobile ? (
@@ -117,16 +123,22 @@ export const Header: React.FC = () => {
             <Button color="inherit" component={Link} to="/about">
               Sobre
             </Button>
+            <Button color="inherit" component={Link} to="/provas">Provas</Button>
+            <Button color="inherit" component={Link} to="/questoes">Questões</Button>
             {user && (
               <>
                 <Button color="inherit" component={Link} to="/dashboard">
                   Dashboard
                 </Button>
+                <Button color="inherit" component={Link} to="/treinos">Meus treinos</Button>
                 <Button color="inherit" component={Link} to="/suporte">
                   <Badge badgeContent={unreadCount} color="error">
                     Suporte
                   </Badge>
                 </Button>
+                {isAdmin && (
+                  <Button color="inherit" component={Link} to="/admin/acervo">Acervo Admin</Button>
+                )}
                 {isAdmin && (
                   <Button color="inherit" component={Link} to="/admin">
                     <Badge badgeContent={adminUnreadCount} color="error">

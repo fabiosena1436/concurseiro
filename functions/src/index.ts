@@ -4,6 +4,7 @@ import * as admin from "firebase-admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cors from "cors";
 import {AiProvider, AiProviderError, generateWithChatApi, isAiProvider} from "./aiProviders";
+export {catalogApi, catalogPdf} from './catalog';
 
 // 1. DEFINIÇÃO DE PARÂMETROS
 // Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)
@@ -250,9 +251,9 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
     }
     
     const data = request.body?.data || {};
-    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } = data;
+    const { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent, title, displayBanca } = data;
 
-    if (typeof subject !== 'string' || !subject.trim() || subject.length > 150 || numQuestions !== 10 || typeof banca !== 'string' || banca.length > 100 || !['fundamental', 'medio', 'superior'].includes(difficulty) || (editalContent !== undefined && typeof editalContent !== 'string') || (specificContent !== undefined && typeof specificContent !== 'string')) {
+    if (typeof subject !== 'string' || !subject.trim() || subject.length > 150 || typeof title !== 'string' || !title.trim() || title.length > 150 || numQuestions !== 10 || typeof banca !== 'string' || banca.length > 100 || !['fundamental', 'medio', 'superior'].includes(difficulty) || (editalContent !== undefined && typeof editalContent !== 'string') || (specificContent !== undefined && typeof specificContent !== 'string')) {
       response.status(400).send({ error: { message: "Argumentos 'subject', 'numQuestions', 'banca', e 'difficulty' são obrigatórios.", status: "INVALID_ARGUMENT" } });
       return;
     }
@@ -323,8 +324,9 @@ export const generateQuestions = onRequest({timeoutSeconds: 300}, (request, resp
         subject: subject,
       }));
 
+      const examRef = await admin.firestore().collection('exams').add({title: title.trim(), creatorId: uid, questions: allQuestions, banca: typeof displayBanca === 'string' ? displayBanca.trim().slice(0, 100) : banca, createdAt: admin.firestore.FieldValue.serverTimestamp(), source: 'generated_ai'});
       succeeded = true;
-      response.status(200).send({ data: allQuestions });
+      response.status(200).send({ data: {questions: allQuestions, examId: examRef.id} });
 
     } catch (error: any) {
       console.error(`Error calling ${provider} API or processing data:`, {

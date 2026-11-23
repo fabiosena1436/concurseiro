@@ -1,6 +1,20 @@
 # Simulado Concurso IA
 
-Aplicação React, TypeScript e Firebase para criar simulados personalizados, praticar e revisar resultados. As questões são geradas por IA e podem conter erros; não são questões oficiais de bancas.
+Aplicação React, TypeScript e Firebase para consultar provas anteriores em PDF, estudar questões revisadas, acompanhar treinos e criar simulados personalizados por IA. As questões geradas livremente por IA podem conter erros e não são questões oficiais de bancas.
+
+## Acervo de provas e questões revisadas
+
+A reformulação acrescenta `/provas`, `/questoes`, `/treinos` e `/admin/acervo`. O catálogo de metadados, PDFs publicados e questões revisadas é público. O treino e seu histórico exigem login. Os simulados gerados livremente por IA permanecem separados do banco revisado.
+
+No painel do acervo, o administrador cadastra uma prova com ano, banca, concurso, órgão, tipo, cargo, escolaridade, matérias, origem e PDF. A publicação exige confirmação do direito de disponibilizar o arquivo. O servidor verifica a assinatura `%PDF-`, o tipo e o limite de 20 MB. É possível associar um PDF de gabarito, editar metadados, ocultar ou excluir uma prova depois de arquivar suas questões vinculadas. Tentativas antigas continuam disponíveis mesmo após essa exclusão, mas o link para a prova de origem deixa de funcionar.
+
+O administrador pode colar até 18 mil caracteres de texto de questões e solicitar a organização pelo provedor de IA ativo. A IA cria rascunhos persistentes, sem gabarito definido. A importação repetida do mesmo texto para a mesma prova reutiliza os rascunhos. O administrador compara texto original e transcrição, revisa alternativas, matéria, assunto, explicação e avisos, confirma a resposta e publica. Versões anteriores ficam em `bankQuestions/{id}/revisions`. Questões arquivadas deixam de aparecer no banco. Treinos concluídos mantêm uma cópia do conteúdo e do gabarito usados na tentativa.
+
+A aba **Taxonomia** permite definir grafias preferidas para bancas, concursos, órgãos, tipos, cargos, escolaridades, matérias e assuntos. Novos cadastros reutilizam a grafia cadastrada quando há correspondência sem distinção de maiúsculas. Provas com os mesmos campos identificadores e questões publicadas com o mesmo número ou enunciado na mesma prova são recusadas.
+
+Os filtros combináveis são exatos, sem distinção de maiúsculas. A busca por título da prova aceita uma palavra entre as oito primeiras do título, também sem acentos. As consultas públicas são paginadas em lotes de 20, e os treinos aceitam de 1 a 50 questões. O primeiro corte não inclui mídia própria por questão: material com imagem, tabela ou fórmula incompleta deve permanecer em rascunho com aviso até que possa ser transcrito corretamente. O limite de PDFs e de questões por treino pode ser alterado no código após validação com acervo real.
+
+Antes de publicar, implante em conjunto Firestore, índices, Storage e Functions: `firebase deploy --only firestore,storage,functions --project simulado-concurso-ia`. A aplicação depende das funções `catalogApi` e `catalogPdf`; os PDFs publicados são servidos pela segunda função, que verifica se a prova continua publicada a cada acesso. A chave `GEMINI_API_KEY` permanece apenas nas Functions. Teste com uma prova real e questões de múltipla escolha e certo ou errado. A revisão de direitos de disponibilização de cada PDF continua sendo responsabilidade do administrador.
 
 ## Fluxo
 

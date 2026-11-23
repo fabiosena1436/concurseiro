@@ -15,6 +15,13 @@ const Signup = lazy(() => import('../pages/Signup').then(module => ({ default: m
 const About = lazy(() => import('../pages/About').then(module => ({ default: module.About })));
 const AdminDashboard = lazy(() => import('../pages/AdminDashboard').then(module => ({ default: module.AdminDashboard })));
 const Support = lazy(() => import('../pages/Support').then(module => ({ default: module.Support })));
+const PaperCatalog = lazy(() => import('../pages/PaperCatalog').then(module => ({default: module.PaperCatalog})));
+const PaperDetails = lazy(() => import('../pages/PaperCatalog').then(module => ({default: module.PaperDetails})));
+const QuestionCatalog = lazy(() => import('../pages/QuestionCatalog').then(module => ({default: module.QuestionCatalog})));
+const BankQuestionDetails = lazy(() => import('../pages/QuestionCatalog').then(module => ({default: module.BankQuestionDetails})));
+const BankTraining = lazy(() => import('../pages/QuestionCatalog').then(module => ({default: module.BankTraining})));
+const BankHistory = lazy(() => import('../pages/QuestionCatalog').then(module => ({default: module.BankHistory})));
+const AdminCatalog = lazy(() => import('../pages/AdminCatalog').then(module => ({default: module.AdminCatalog})));
 const page = (element: React.ReactNode) => <Suspense fallback={<Loader>Carregando página...</Loader>}>{element}</Suspense>;
 
 export const router = createBrowserRouter([
@@ -30,6 +37,10 @@ export const router = createBrowserRouter([
         path: "/about",
         element: page(<About />),
       },
+      {path: "/provas", element: page(<PaperCatalog />)},
+      {path: "/provas/:id", element: page(<PaperDetails />)},
+      {path: "/questoes", element: page(<QuestionCatalog />)},
+      {path: "/questoes/:id", element: page(<BankQuestionDetails />)},
       {
         path: "/login",
         element: page(<Login />),
@@ -61,6 +72,8 @@ export const router = createBrowserRouter([
             path: "/suporte",
             element: page(<Support />),
           },
+          {path: "/treinos/:id", element: page(<BankTraining />)},
+          {path: "/treinos", element: page(<BankHistory />)},
         ]
       },
       {
@@ -69,7 +82,8 @@ export const router = createBrowserRouter([
           {
             path: "/admin",
             element: page(<AdminDashboard />),
-          }
+          },
+          {path: "/admin/acervo", element: page(<AdminCatalog />)},
         ]
       }
     ],

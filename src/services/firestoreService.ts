@@ -33,7 +33,6 @@ const ensureAuthenticatedUser = async (): Promise<void> => {
   }
 };
 
-const examsCollection = collection(db, "exams");
 const resultsCollection = collection(db, "results");
 const usersCollection = collection(db, "users");
 const messagesCollection = collection(db, "messages");
@@ -166,16 +165,6 @@ export const toggleUserUnlockStatus = async (uid: string, isUnlocked: boolean): 
  * @param examData - Os dados do simulado a serem salvos.
  * @returns O ID do simulado criado.
  */
-export const createExam = async (
-  examData: Omit<Exam, "id" | "createdAt">
-): Promise<string> => {
-  const docRef = await addDoc(examsCollection, {
-    ...examData,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
-};
-
 /**
  * Busca um simulado específico no Firestore pelo seu ID.
  * @param examId - O ID do simulado.

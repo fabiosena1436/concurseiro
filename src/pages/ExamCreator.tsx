@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../services/firebase';
-import { createExam } from '../services/firestoreService';
 import { generateQuestionsFromBank } from '../services/aiService';
 import {
   Container,
@@ -104,15 +103,19 @@ export const ExamCreator: React.FC = () => {
         if (Array.isArray(parsed)) existingQuestions = (parsed as unknown[]).filter((item): item is { question: string } => typeof item === 'object' && item !== null && 'question' in item && typeof item.question === 'string');
       } catch { localStorage.removeItem(storageKey); }
 
-      const questionsToUse = await generateQuestionsFromBank(
+      const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
+      const generated = await generateQuestionsFromBank(
         subjectForApi, 
         numQuestions, 
         bancaApi,
         difficulty, 
         useEditalContent ? editalContent : undefined,
         existingQuestions,
-        !useEditalContent ? specificContent : undefined
+        !useEditalContent ? specificContent : undefined,
+        examTitle,
+        bancaDisplay
       );
+      const questionsToUse = generated.questions;
 
       if (questionsToUse.length === 0) throw new Error('Nenhuma questão foi gerada. Tente novamente.');
 
@@ -120,17 +123,7 @@ export const ExamCreator: React.FC = () => {
       const allQuestionsToStore = [...existingQuestions, ...newQuestionTexts].slice(-50);
       localStorage.setItem(storageKey, JSON.stringify(allQuestionsToStore));
       
-      const examTitle = useEditalContent ? finalSubject : `Simulado de ${finalSubject}`;
-
-      const examData = {
-        title: examTitle,
-        creatorId: auth.currentUser.uid,
-        questions: questionsToUse,
-        banca: bancaDisplay,
-      };
-
-      const examId = await createExam(examData);
-      void navigate(`/simulado/${examId}`);
+      void navigate(`/simulado/${generated.examId}`);
 
     } catch (err) {
       console.error("Erro ao criar o simulado: ", err);
