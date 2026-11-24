@@ -4,6 +4,10 @@ Aplicação React, TypeScript e Firebase para consultar provas anteriores em PDF
 
 ## Acervo de provas e questões revisadas
 
+O painel `/admin/acervo` inclui **Fontes**, uma fila de metadados para análise. Cole até 100 linhas tabuladas por lote (título, ano, banca, órgão, cargo, URL HTTPS); URLs repetidas são reconhecidas. Selecionar uma fonte prepara um rascunho de prova, sem baixar nem publicar conteúdo automaticamente. Veja [a arquitetura e os critérios de expansão](docs/arquitetura-acervo.md).
+
+Na aba **Questões e importação**, é possível colar até 180 mil caracteres de uma prova completa. O navegador divide o texto em blocos de até 14 mil caracteres, e a API salva rascunhos por bloco. Repita a operação após uma falha: blocos idênticos reutilizam os rascunhos já gravados. O PDF pode ser anexado à prova; a extração direta do arquivo ainda requer uma etapa própria de implementação. Na página de uma questão publicada, usuários autenticados podem pedir até 20 dicas de IA por dia.
+
 A reformulação acrescenta `/provas`, `/questoes`, `/treinos` e `/admin/acervo`. O catálogo de metadados, PDFs publicados e questões revisadas é público. O treino e seu histórico exigem login. Os simulados gerados livremente por IA permanecem separados do banco revisado.
 
 No painel do acervo, o administrador cadastra uma prova com ano, banca, concurso, órgão, tipo, cargo, escolaridade, matérias, origem e PDF. A publicação exige confirmação do direito de disponibilizar o arquivo. O servidor verifica a assinatura `%PDF-`, o tipo e o limite de 20 MB. É possível associar um PDF de gabarito, editar metadados, ocultar ou excluir uma prova depois de arquivar suas questões vinculadas. Tentativas antigas continuam disponíveis mesmo após essa exclusão, mas o link para a prova de origem deixa de funcionar.

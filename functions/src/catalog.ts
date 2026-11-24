@@ -4,6 +4,7 @@ import {GoogleGenerativeAI} from '@google/generative-ai';
 import {createHash} from 'node:crypto';
 import {defineString} from 'firebase-functions/params';
 import {AiProviderError, generateWithChatApi, isAiProvider} from './aiProviders';
+import {discoverOfficial} from './discovery';
 
 type Data = Record<string, any>;
 const db = () => admin.firestore();
@@ -61,6 +62,17 @@ const taxonomyKeys = ['bancas', 'concursos', 'orgaos', 'tipos', 'cargos', 'escol
 const emptyTaxonomy = () => Object.fromEntries(taxonomyKeys.map(key => [key, []]));
 const standard = (value: string, values: string[]) => values.find(item => canonical(item) === canonical(value)) ?? value;
 const normalizePaper = (p: Data, t: Data) => ({...p, banca: standard(p.banca, t.bancas), concurso: standard(p.concurso, t.concursos), orgao: standard(p.orgao, t.orgaos), tipo: standard(p.tipo, t.tipos), cargo: standard(p.cargo, t.cargos), escolaridade: standard(p.escolaridade, t.escolaridades), materias: Array.isArray(p.materias) ? p.materias.map((value: string) => standard(value, t.materias)) : []});
+const sourceKey = (url: string) => createHash('sha256').update(url).digest('hex');
+const normalizeSourceUrl = (value: unknown) => {
+  const raw = clean(value, 1000);
+  let url: URL;
+  try { url = new URL(raw); } catch { return fail(400, 'URL de origem inválida.'); }
+  if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password || /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(url.hostname)) fail(400, 'Use uma URL HTTPS pública de órgão ou banca.');
+  url.hash = '';
+  url.hostname = url.hostname.toLowerCase();
+  for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid|gclid)/i.test(key)) url.searchParams.delete(key);
+  return url.toString();
+};
 
 export const catalogApi = onRequest({timeoutSeconds: 120, cors: true}, async (request, response) => {
   try {
@@ -84,6 +96,83 @@ export const catalogApi = onRequest({timeoutSeconds: 120, cors: true}, async (re
       }
       await db().collection('systemSettings').doc('taxonomy').set({...normalized, updatedAt: now(), updatedBy: user!.uid});
       result = normalized;
+    } else if (action === 'importSourceCandidates') {
+      adminOnly(user);
+      if (!Array.isArray(data.items) || data.items.length < 1 || data.items.length > 100) fail(400, 'Envie de 1 a 100 fontes por lote.');
+      const collection = db().collection('sourceCandidates');
+      const batch = db().batch();
+      const seen = new Set<string>();
+      let added = 0;
+      let existing = 0;
+      for (const item of data.items) {
+        const url = normalizeSourceUrl(item?.url);
+        const title = clean(item?.title, 200);
+        const banca = clean(item?.banca, 100);
+        const year = Number(item?.year);
+        if (!title || !banca || !Number.isInteger(year) || year < 1900 || year > new Date().getFullYear() + 1) fail(400, 'Cada fonte precisa de título, banca, ano e URL HTTPS.');
+        const id = sourceKey(url);
+        if (seen.has(id)) {existing++; continue;}
+        seen.add(id);
+        const ref = collection.doc(id);
+        if ((await ref.get()).exists) {existing++; continue;}
+        batch.set(ref, {url, title, banca, year, orgao: clean(item?.orgao, 100), cargo: clean(item?.cargo, 100), status: 'pending', discoveredAt: now(), discoveredBy: user!.uid, note: clean(item?.note, 500)});
+        added++;
+      }
+      if (added) await batch.commit();
+      result = {added, existing};
+    } else if (action === 'listSourceCandidates') {
+      adminOnly(user);
+      const collection = db().collection('sourceCandidates');
+      let query = collection.orderBy('discoveredAt', 'desc').limit(51);
+      if (typeof data.cursor === 'string' && data.cursor) {
+        const cursor = await collection.doc(data.cursor).get();
+        if (cursor.exists) query = query.startAfter(cursor);
+      }
+      const docs = (await query.get()).docs;
+      result = {items: docs.slice(0, 50).map(out), nextCursor: docs.length > 50 ? docs[49].id : null};
+    } else if (action === 'reviewSourceCandidate') {
+      adminOnly(user);
+      const id = clean(data.id, 100);
+      if (!/^[a-f0-9]{64}$/.test(id) || !['pending', 'accepted', 'rejected'].includes(data.status)) fail(400, 'Revisão inválida.');
+      const ref = db().collection('sourceCandidates').doc(id);
+      if (!(await ref.get()).exists) fail(404, 'Fonte não encontrada.');
+      await ref.update({status: data.status, reviewedAt: now(), reviewedBy: user!.uid});
+      result = {id};
+    } else if (action === 'getDiscoverySettings') {
+      adminOnly(user);
+      const saved = (await db().collection('systemSettings').doc('discovery').get()).data() ?? {};
+      result = {enabled: saved.enabled === true, terms: Array.isArray(saved.terms) ? saved.terms : [], lastRunAt: saved.lastRunAt ?? null};
+    } else if (action === 'saveDiscoverySettings') {
+      adminOnly(user);
+      const terms = data.terms;
+      if (!Array.isArray(terms) || terms.length > 5 || terms.some((x: unknown) => typeof x !== 'string' || x.trim().length < 3 || x.length > 120)) fail(400, 'Informe até cinco temas de busca.');
+      await db().collection('systemSettings').doc('discovery').set({enabled: data.enabled === true, terms: [...new Set(terms.map((x: string) => x.trim()))], updatedAt: now(), updatedBy: user!.uid}, {merge: true});
+      result = {enabled: data.enabled === true, terms};
+    } else if (action === 'runDiscoverySearch') {
+      adminOnly(user);
+      const term = clean(data.term, 120);
+      if (term.length < 3) fail(400, 'Informe o tema da busca.');
+      const day = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
+      const usageRef = db().collection('discoveryUsage').doc(`${user!.uid}_${day}`);
+      await db().runTransaction(async transaction => {
+        const usage = await transaction.get(usageRef);
+        if ((usage.data()?.count ?? 0) >= 10) fail(429, 'Limite diário de 10 buscas atingido.');
+        transaction.set(usageRef, {count: (usage.data()?.count ?? 0) + 1, day, userId: user!.uid}, {merge: true});
+      });
+      try {result = await discoverOfficial(term);} catch (error) {
+        await usageRef.update({count: admin.firestore.FieldValue.increment(-1)});
+        throw error;
+      }
+    } else if (action === 'listTelegramInbox') {
+      adminOnly(user);
+      const collection = db().collection('telegramInbox');
+      let query = collection.orderBy('receivedAt', 'desc').limit(51);
+      if (typeof data.cursor === 'string' && data.cursor) {
+        const cursor = await collection.doc(data.cursor).get();
+        if (cursor.exists) query = query.startAfter(cursor);
+      }
+      const docs = (await query.get()).docs;
+      result = {items: docs.slice(0, 50).map(out), nextCursor: docs.length > 50 ? docs[49].id : null};
     } else if (action === 'adminStats') {
       adminOnly(user);
       const entries = await Promise.all([
@@ -94,6 +183,36 @@ export const catalogApi = onRequest({timeoutSeconds: 120, cors: true}, async (re
         db().collection('bankQuestions').where('status', '==', 'archived').count().get(),
       ]);
       result = {paperDrafts: entries[0].data().count, papersPublished: entries[1].data().count, questionDrafts: entries[2].data().count, questionsPublished: entries[3].data().count, questionsArchived: entries[4].data().count};
+    } else if (action === 'studyHint') {
+      requireUser(user);
+      const questionId = clean(data.questionId, 100);
+      const message = clean(data.message, 500);
+      const question = await db().collection('bankQuestions').doc(questionId).get();
+      if (!question.exists || question.data()?.status !== 'published') fail(404, 'Questão não encontrada.');
+      const setting = (await db().collection('systemSettings').doc('ai').get()).data()?.activeProvider;
+      const provider = isAiProvider(setting) ? setting : 'gemini';
+      const key = provider === 'groq' ? importGroqKey.value() : provider === 'openrouter' ? importOpenrouterKey.value() : importGeminiKey.value();
+      if (!key || key === 'disabled') fail(503, 'Assistente indisponível no momento.');
+      const day = new Intl.DateTimeFormat('en-CA', {timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'}).format(new Date());
+      const usageRef = db().collection('studyHintUsage').doc(`${user!.uid}_${day}`);
+      await db().runTransaction(async transaction => {
+        const usage = await transaction.get(usageRef);
+        if ((usage.data()?.count ?? 0) >= 20) fail(429, 'Limite diário de 20 dicas atingido.');
+        transaction.set(usageRef, {count: (usage.data()?.count ?? 0) + 1, userId: user!.uid, day}, {merge: true});
+      });
+      const q = question.data()!;
+      const prompt = `Você é um tutor para concurso. Ajude o estudante a RACIOCINAR sobre a questão sem fornecer a letra, o gabarito ou a resposta final. Dê uma pista curta e uma pergunta orientadora. Se o conteúdo depender de lei ou fato atual, peça conferência na fonte atualizada. Se faltar figura, tabela ou contexto, diga isso.\nQuestão: ${clean(q.text, 5000)}\nAlternativas: ${JSON.stringify(q.options)}\nMatéria: ${clean(q.subject)}; assunto: ${clean(q.topic)}.\nPedido do estudante: ${message || 'Dê uma primeira dica.'}`;
+      try {
+        let hint: string;
+        if (provider === 'gemini') {
+          const model = new GoogleGenerativeAI(key).getGenerativeModel({model: importGeminiModel.value()});
+          hint = (await model.generateContent(prompt)).response.text();
+        } else hint = await generateWithChatApi(provider, key, prompt, 'Você é um tutor. Dê somente dicas, sem revelar a resposta ou letra correta.');
+        result = {hint: clean(hint, 1800)};
+      } catch (error) {
+        await usageRef.update({count: admin.firestore.FieldValue.increment(-1)});
+        throw error;
+      }
     } else if (action === 'countQuestions') {
       const filters = data.filters && typeof data.filters === 'object' ? data.filters : {};
       const count = await db().collection('bankQuestions').where('facetKeys', 'array-contains', filterKey('published', filters)).count().get();

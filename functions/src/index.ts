@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cors from "cors";
 import {AiProvider, AiProviderError, generateWithChatApi, isAiProvider} from "./aiProviders";
 export {catalogApi, catalogPdf} from './catalog';
+export {telegramWebhook, scheduledDiscovery} from './discovery';
 
 // 1. DEFINIÇÃO DE PARÂMETROS
 // Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)

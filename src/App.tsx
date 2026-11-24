@@ -7,10 +7,10 @@ import { Box } from "@mui/material";
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#1746a2', dark: '#102f71', light: '#e8efff' },
-    secondary: { main: '#c26815' },
-    background: { default: '#f6f8fc', paper: '#ffffff' },
-    text: { primary: '#17243b', secondary: '#52617a' },
+    primary: { main: '#147a62', dark: '#0d604d', light: '#e8f5ef' },
+    secondary: { main: '#163c51' },
+    background: { default: '#f6f9f9', paper: '#ffffff' },
+    text: { primary: '#122b43', secondary: '#52677a' },
   },
   typography: {
     fontFamily: 'Inter, Arial, sans-serif',

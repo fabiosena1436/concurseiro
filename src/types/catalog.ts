@@ -22,6 +22,34 @@ export type Paper = {
   updatedAt?: string;
 };
 
+export type SourceCandidate = {
+  id: string;
+  title: string;
+  year: number;
+  banca: string;
+  orgao: string;
+  cargo: string;
+  url: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  discoveredAt: string;
+};
+
+export type TelegramInboxItem = {
+  id: string;
+  fromId: string;
+  chatId: string;
+  messageId: number;
+  text: string;
+  links: string[];
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  receivedAt: string;
+  status: 'pending';
+};
+
+export type DiscoverySettings = {enabled: boolean; terms: string[]; lastRunAt?: string | null};
+
 export type BankQuestion = {
   id: string;
   paperId: string;

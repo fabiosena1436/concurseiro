@@ -1,7 +1,7 @@
-﻿import {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {Link, useNavigate, useSearchParams, useParams} from 'react-router-dom';
 import {Alert, Box, Button, Card, CardContent, Container, FormControlLabel, Radio, RadioGroup, Stack, TextField, Typography} from '@mui/material';
-import {countQuestions, finishAttempt, getAttempt, listAttempts, listQuestions, saveAttempt, startFilteredAttempt} from '../services/catalogService';
+import {countQuestions, finishAttempt, getAttempt, listAttempts, listQuestions, saveAttempt, startFilteredAttempt, studyHint} from '../services/catalogService';
 import {useAuth} from '../hooks/useAuth';
 import type {BankAttempt, BankAttemptSummary, BankQuestion, CatalogFilters} from '../types/catalog';
 
@@ -37,7 +37,20 @@ export function BankQuestionDetails() {
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {void import('../services/catalogService').then(s => s.getQuestion(id)).then(setQ).catch(e => setError(String(e)));}, [id]);
-  return <Container maxWidth="md" sx={{py: 4}}>{error && <Alert severity="error">{error}</Alert>}{q && <><Typography variant="h4" component="h1">Questão {q.number || ''}</Typography><Typography color="text.secondary">{q.subject} · {q.topic} · {q.banca} · {q.year}</Typography><Typography variant="h6" sx={{my: 3}}>{q.text}</Typography><RadioGroup value={selected ?? ''} onChange={e => setSelected(Number(e.target.value))}>{q.options.map((option, i) => <FormControlLabel key={i} value={i} control={<Radio/>} label={`${String.fromCharCode(65+i)}. ${option}`} disabled={revealed}/>)}</RadioGroup><Button variant="contained" onClick={() => setRevealed(true)} sx={{mt: 2}}>Revelar correção</Button>{revealed && <Alert severity={selected === q.correctAnswer ? 'success' : 'info'} sx={{mt: 2}}>Gabarito: {String.fromCharCode(65 + (q.correctAnswer ?? 0))}. {q.options[q.correctAnswer ?? 0]}<br/>{q.explanation}</Alert>}<Box sx={{mt: 2}}><Button component={Link} to={`/provas/${q.paperId}`}>Ver prova de origem</Button>{q.adapted && <Typography variant="body2">Questão adaptada da fonte.</Typography>}</Box></>}</Container>;
+  return <Container maxWidth="md" sx={{py: 4}}>{error && <Alert severity="error">{error}</Alert>}{q && <><Typography variant="h4" component="h1">Questão {q.number || ''}</Typography><Typography color="text.secondary">{q.subject} · {q.topic} · {q.banca} · {q.year}</Typography><Typography variant="h6" sx={{my: 3}}>{q.text}</Typography><RadioGroup value={selected ?? ''} onChange={e => setSelected(Number(e.target.value))}>{q.options.map((option, i) => <FormControlLabel key={i} value={i} control={<Radio/>} label={`${String.fromCharCode(65+i)}. ${option}`} disabled={revealed}/>)}</RadioGroup><Button variant="contained" onClick={() => setRevealed(true)} sx={{mt: 2}}>Revelar correção</Button>{revealed && <Alert severity={selected === q.correctAnswer ? 'success' : 'info'} sx={{mt: 2}}>Gabarito: {String.fromCharCode(65 + (q.correctAnswer ?? 0))}. {q.options[q.correctAnswer ?? 0]}<br/>{q.explanation}</Alert>}<StudyAssistant questionId={q.id}/><Box sx={{mt: 2}}><Button component={Link} to={`/provas/${q.paperId}`}>Ver prova de origem</Button>{q.adapted && <Typography variant="body2">Questão adaptada da fonte.</Typography>}</Box></>}</Container>;
+}
+
+function StudyAssistant({questionId}: {questionId: string}) {
+  const {user} = useAuth();
+  const [message, setMessage] = useState('');
+  const [hint, setHint] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const ask = async () => {
+    setBusy(true); setError('');
+    try {setHint((await studyHint(questionId, message)).hint);} catch (e) {setError(e instanceof Error ? e.message : String(e));} finally {setBusy(false);}
+  };
+  return <Card variant="outlined" sx={{mt: 3, bgcolor: '#f4faf7'}}><CardContent><Typography variant="h6" fontWeight={700}>Assistente de estudo</Typography><Typography variant="body2" color="text.secondary" sx={{mb: 2}}>Peça uma dica para raciocinar antes de conferir o gabarito. Até 20 dicas por dia por conta.</Typography><TextField label="Em que parte você travou?" value={message} onChange={e => setMessage(e.target.value.slice(0, 500))} fullWidth multiline minRows={2}/><Button sx={{mt: 2}} variant="outlined" disabled={busy || !user} onClick={() => void ask()}>{busy ? 'Pensando...' : 'Pedir dica'}</Button>{!user && <Button component={Link} to="/login" sx={{mt: 2}}>Entrar para usar</Button>}{error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}{hint && <Alert severity="info" sx={{mt: 2}}>{hint}</Alert>}</CardContent></Card>;
 }
 
 export function BankTraining() {
@@ -54,6 +67,7 @@ export function BankTraining() {
   const q = attempt.snapshot[index];
   return <Container maxWidth="md" sx={{py: 4}}><Typography variant="h4" component="h1">{attempt.status === 'completed' ? 'Resultado do treino' : 'Treino de questões'}</Typography>{error && <Alert severity="error">{error}</Alert>}{attempt.status === 'completed' && <Alert severity="success" sx={{my: 2}}>Acertos: {attempt.score?.toFixed(1)}%. Suas respostas e o gabarito desta tentativa foram preservados.</Alert>}
     <Typography sx={{my: 2}}>Questão {index + 1} de {attempt.snapshot.length} · {q.subject} · {q.topic}</Typography><Typography variant="h6">{q.text}</Typography><RadioGroup value={answers[q.id] ?? ''} onChange={e => setAnswers({...answers, [q.id]: Number(e.target.value)})}>{q.options.map((option, i) => <FormControlLabel key={i} value={i} control={<Radio/>} disabled={attempt.status === 'completed'} label={`${String.fromCharCode(65+i)}. ${option}`}/>)}</RadioGroup>
+    {attempt.status === 'in_progress' && <StudyAssistant key={q.id} questionId={q.id}/>}
     {attempt.status === 'completed' && <Alert severity={answers[q.id] === q.correctAnswer ? 'success' : 'info'} sx={{mt: 2}}>Gabarito: {q.options[q.correctAnswer ?? 0]}. {q.explanation}<br/><Link to={`/provas/${q.paperId}`}>Ver prova de origem</Link></Alert>}
     <Stack direction="row" gap={1} sx={{mt: 3}}><Button disabled={index === 0} onClick={() => setIndex(index-1)}>Anterior</Button><Button disabled={index >= attempt.snapshot.length-1} onClick={() => setIndex(index+1)}>Próxima</Button>{attempt.status === 'in_progress' && <Button variant="contained" disabled={busy} onClick={() => void finish()}>Concluir treino</Button>}</Stack>
   </Container>;

@@ -1,6 +1,6 @@
 import {getStorage, ref, uploadBytes} from 'firebase/storage';
 import {auth} from './firebase';
-import type {BankAttempt, BankAttemptSummary, BankQuestion, CatalogFilters, Paper, Taxonomy} from '../types/catalog';
+import type {BankAttempt, BankAttemptSummary, BankQuestion, CatalogFilters, DiscoverySettings, Paper, SourceCandidate, Taxonomy, TelegramInboxItem} from '../types/catalog';
 
 const endpoint = 'https://us-central1-simulado-concurso-ia.cloudfunctions.net/catalogApi';
 
@@ -22,6 +22,7 @@ export const listPapers = (filters: CatalogFilters = {}, cursor?: string, status
 export const listQuestions = (filters: CatalogFilters = {}, cursor?: string, status?: 'draft' | 'archived') => catalogCall<Page<BankQuestion>>('listQuestions', {filters, cursor, status});
 export const getPaper = (id: string) => catalogCall<Paper>('getPaper', {id});
 export const getQuestion = (id: string) => catalogCall<BankQuestion>('getQuestion', {id});
+export const studyHint = (questionId: string, message: string) => catalogCall<{hint: string}>('studyHint', {questionId, message});
 export const savePaper = (paper: Paper) => catalogCall<{id: string}>('savePaper', {id: paper.id, paper});
 export const deletePaper = (id: string) => catalogCall<{id: string}>('deletePaper', {id});
 export const saveQuestion = (question: BankQuestion) => catalogCall<{id: string; version: number}>('saveQuestion', {id: question.id, question});
@@ -32,6 +33,13 @@ export const startFilteredAttempt = (filters: CatalogFilters, quantity: number) 
 export const countQuestions = (filters: CatalogFilters) => catalogCall<{count: number}>('countQuestions', {filters});
 export const adminStats = () => catalogCall<{paperDrafts: number; papersPublished: number; questionDrafts: number; questionsPublished: number; questionsArchived: number}>('adminStats');
 export const getTaxonomy = () => catalogCall<Taxonomy>('getTaxonomy');
+export const importSourceCandidates = (items: Array<Pick<SourceCandidate, 'title' | 'year' | 'banca' | 'orgao' | 'cargo' | 'url'>>) => catalogCall<{added: number; existing: number}>('importSourceCandidates', {items});
+export const listSourceCandidates = (cursor?: string) => catalogCall<Page<SourceCandidate>>('listSourceCandidates', {cursor});
+export const reviewSourceCandidate = (id: string, status: SourceCandidate['status']) => catalogCall<{id: string}>('reviewSourceCandidate', {id, status});
+export const getDiscoverySettings = () => catalogCall<DiscoverySettings>('getDiscoverySettings');
+export const saveDiscoverySettings = (enabled: boolean, terms: string[]) => catalogCall<DiscoverySettings>('saveDiscoverySettings', {enabled, terms});
+export const runDiscoverySearch = (term: string) => catalogCall<{added: number; found: number}>('runDiscoverySearch', {term});
+export const listTelegramInbox = (cursor?: string) => catalogCall<Page<TelegramInboxItem>>('listTelegramInbox', {cursor});
 export const saveTaxonomy = (taxonomy: Taxonomy) => catalogCall<Taxonomy>('saveTaxonomy', {taxonomy});
 export const getAttempt = (id: string) => catalogCall<BankAttempt>('getAttempt', {id});
 export const saveAttempt = (id: string, answers: Record<string, number>) => catalogCall<{saved: boolean}>('saveAttempt', {id, answers});

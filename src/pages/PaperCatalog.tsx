@@ -1,12 +1,13 @@
 ﻿import {useEffect, useState} from 'react';
-import {Link, useParams} from 'react-router-dom';
+import {Link, useParams, useSearchParams} from 'react-router-dom';
 import {Alert, Box, Button, Card, CardContent, Container, Stack, TextField, Typography} from '@mui/material';
 import {getPaper, listPapers, pdfUrl} from '../services/catalogService';
 import type {CatalogFilters, Paper} from '../types/catalog';
 
 const empty: CatalogFilters = {};
 export function PaperCatalog() {
-  const [filters, setFilters] = useState<CatalogFilters>(empty);
+  const [params] = useSearchParams();
+  const [filters, setFilters] = useState<CatalogFilters>(() => ({...empty, search: params.get('search') || undefined}));
   const [items, setItems] = useState<Paper[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
