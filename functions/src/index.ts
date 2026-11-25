@@ -5,12 +5,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as cors from "cors";
 import {AiProvider, AiProviderError, generateWithChatApi, isAiProvider} from "./aiProviders";
 export {catalogApi, catalogPdf} from './catalog';
-export {telegramWebhook, scheduledDiscovery} from './discovery';
+export {telegramWebhook, configureTelegramWebhook, telegramWebhookStatus, scheduledDiscovery} from './discovery';
 
 // 1. DEFINIÇÃO DE PARÂMETROS
 // Trocado de OPENAI_KEY para GEMINI_API_KEY (Gratuita na cota padrão)
 const geminiApiKey = defineString("GEMINI_API_KEY");
-const geminiModelStr = defineString("GEMINI_MODEL", {default: "gemini-2.5-flash"});
+const geminiModelStr = defineString("GEMINI_MODEL", {default: "gemini-3.5-flash-lite"});
 const groqApiKey = defineString("GROQ_API_KEY", {default: "disabled"});
 const openrouterApiKey = defineString("OPENROUTER_API_KEY", {default: "disabled"});
 const adminEmailsConfig = defineString("ADMIN_EMAILS", { default: "" });

@@ -9,7 +9,7 @@ import {discoverOfficial} from './discovery';
 type Data = Record<string, any>;
 const db = () => admin.firestore();
 const importGeminiKey = defineString('GEMINI_API_KEY');
-const importGeminiModel = defineString('GEMINI_MODEL', {default: 'gemini-2.5-flash'});
+const importGeminiModel = defineString('GEMINI_MODEL', {default: 'gemini-3.5-flash-lite'});
 const importGroqKey = defineString('GROQ_API_KEY', {default: 'disabled'});
 const importOpenrouterKey = defineString('OPENROUTER_API_KEY', {default: 'disabled'});
 const clean = (value: unknown, max = 160) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -161,6 +161,7 @@ export const catalogApi = onRequest({timeoutSeconds: 120, cors: true}, async (re
       });
       try {result = await discoverOfficial(term);} catch (error) {
         await usageRef.update({count: admin.firestore.FieldValue.increment(-1)});
+        if (error instanceof Error && (error.message.includes('TAVILY_API_KEY') || error.message.includes('cota gratuita da Tavily'))) fail(503, error.message);
         throw error;
       }
     } else if (action === 'listTelegramInbox') {

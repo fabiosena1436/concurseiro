@@ -40,6 +40,22 @@ export const getDiscoverySettings = () => catalogCall<DiscoverySettings>('getDis
 export const saveDiscoverySettings = (enabled: boolean, terms: string[]) => catalogCall<DiscoverySettings>('saveDiscoverySettings', {enabled, terms});
 export const runDiscoverySearch = (term: string) => catalogCall<{added: number; found: number}>('runDiscoverySearch', {term});
 export const listTelegramInbox = (cursor?: string) => catalogCall<Page<TelegramInboxItem>>('listTelegramInbox', {cursor});
+export type TelegramWebhookStatus = {connected: boolean; pending: number; lastError: string};
+async function telegramAdminCall<T>(functionName: 'configureTelegramWebhook' | 'telegramWebhookStatus'): Promise<T> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Entre na conta de administrador.');
+  const response = await fetch(`https://us-central1-simulado-concurso-ia.cloudfunctions.net/${functionName}`, {method: 'POST', headers: {Authorization: `Bearer ${token}`}});
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = body && typeof body === 'object' && 'error' in body ? body.error : null;
+    const message = error && typeof error === 'object' && 'message' in error ? error.message : null;
+    throw new Error(typeof message === 'string' ? message : 'Não foi possível conectar o bot.');
+  }
+  if (!body || typeof body !== 'object' || !('data' in body)) throw new Error('Resposta inválida do Telegram.');
+  return body.data as T;
+}
+export const configureTelegramWebhook = () => telegramAdminCall<{connected: boolean}>('configureTelegramWebhook');
+export const getTelegramWebhookStatus = () => telegramAdminCall<TelegramWebhookStatus>('telegramWebhookStatus');
 export const saveTaxonomy = (taxonomy: Taxonomy) => catalogCall<Taxonomy>('saveTaxonomy', {taxonomy});
 export const getAttempt = (id: string) => catalogCall<BankAttempt>('getAttempt', {id});
 export const saveAttempt = (id: string, answers: Record<string, number>) => catalogCall<{saved: boolean}>('saveAttempt', {id, answers});

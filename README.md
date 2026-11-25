@@ -8,6 +8,8 @@ O painel `/admin/acervo` inclui **Fontes**, uma fila de metadados para análise.
 
 Na aba **Questões e importação**, é possível colar até 180 mil caracteres de uma prova completa. O navegador divide o texto em blocos de até 14 mil caracteres, e a API salva rascunhos por bloco. Repita a operação após uma falha: blocos idênticos reutilizam os rascunhos já gravados. O PDF pode ser anexado à prova; a extração direta do arquivo ainda requer uma etapa própria de implementação. Na página de uma questão publicada, usuários autenticados podem pedir até 20 dicas de IA por dia.
 
+O bot do Telegram e a pesquisa automática estão preparados, mas a implantação foi pausada para respeitar a exigência de APIs gratuitas sem cartão. A busca usa Tavily Free e o disparo diário pode usar cron-job.org; o backend Firebase Functions atual exige Blaze. Veja [as APIs escolhidas, cadastros e limites](docs/ativacao-descoberta.md).
+
 A reformulação acrescenta `/provas`, `/questoes`, `/treinos` e `/admin/acervo`. O catálogo de metadados, PDFs publicados e questões revisadas é público. O treino e seu histórico exigem login. Os simulados gerados livremente por IA permanecem separados do banco revisado.
 
 No painel do acervo, o administrador cadastra uma prova com ano, banca, concurso, órgão, tipo, cargo, escolaridade, matérias, origem e PDF. A publicação exige confirmação do direito de disponibilizar o arquivo. O servidor verifica a assinatura `%PDF-`, o tipo e o limite de 20 MB. É possível associar um PDF de gabarito, editar metadados, ocultar ou excluir uma prova depois de arquivar suas questões vinculadas. Tentativas antigas continuam disponíveis mesmo após essa exclusão, mas o link para a prova de origem deixa de funcionar.
@@ -67,7 +69,7 @@ No projeto Firebase `simulado-concurso-ia`, crie ou edite o arquivo ignorado `fu
 
 ```dotenv
 GEMINI_API_KEY="sua_chave_gemini_existente"
-GEMINI_MODEL="gemini-2.5-flash"
+GEMINI_MODEL="gemini-3.5-flash-lite"
 GROQ_API_KEY="disabled"
 OPENROUTER_API_KEY="disabled"
 ADMIN_EMAILS="seu_email_administrativo"
