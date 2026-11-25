@@ -3,6 +3,21 @@ import {auth} from './firebase';
 import type {BankAttempt, BankAttemptSummary, BankQuestion, CatalogFilters, DiscoverySettings, Paper, SourceCandidate, Taxonomy, TelegramInboxItem} from '../types/catalog';
 
 const endpoint = 'https://us-central1-simulado-concurso-ia.cloudfunctions.net/catalogApi';
+const discoveryEndpoint = import.meta.env.VITE_DISCOVERY_ENDPOINT || 'https://vgykwicsfguwlxztmiqp.supabase.co/functions/v1/discovery';
+
+async function discoveryCall<T>(action: string, input: Record<string, unknown> = {}): Promise<T> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Entre na conta de administrador.');
+  const response = await fetch(discoveryEndpoint, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token}`}, body: JSON.stringify({data: {action, ...input}})});
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = payload && typeof payload === 'object' && 'error' in payload ? payload.error : null;
+    const message = error && typeof error === 'object' && 'message' in error ? error.message : null;
+    throw new Error(typeof message === 'string' ? message : 'Não foi possível carregar as fontes. Tente novamente.');
+  }
+  if (!payload || typeof payload !== 'object' || !('data' in payload)) throw new Error('Resposta inválida do servidor.');
+  return payload.data as T;
+}
 
 export async function catalogCall<T>(action: string, input: Record<string, unknown> = {}): Promise<T> {
   const token = await auth.currentUser?.getIdToken();
@@ -33,26 +48,16 @@ export const startFilteredAttempt = (filters: CatalogFilters, quantity: number) 
 export const countQuestions = (filters: CatalogFilters) => catalogCall<{count: number}>('countQuestions', {filters});
 export const adminStats = () => catalogCall<{paperDrafts: number; papersPublished: number; questionDrafts: number; questionsPublished: number; questionsArchived: number}>('adminStats');
 export const getTaxonomy = () => catalogCall<Taxonomy>('getTaxonomy');
-export const importSourceCandidates = (items: Array<Pick<SourceCandidate, 'title' | 'year' | 'banca' | 'orgao' | 'cargo' | 'url'>>) => catalogCall<{added: number; existing: number}>('importSourceCandidates', {items});
-export const listSourceCandidates = (cursor?: string) => catalogCall<Page<SourceCandidate>>('listSourceCandidates', {cursor});
-export const reviewSourceCandidate = (id: string, status: SourceCandidate['status']) => catalogCall<{id: string}>('reviewSourceCandidate', {id, status});
-export const getDiscoverySettings = () => catalogCall<DiscoverySettings>('getDiscoverySettings');
-export const saveDiscoverySettings = (enabled: boolean, terms: string[]) => catalogCall<DiscoverySettings>('saveDiscoverySettings', {enabled, terms});
-export const runDiscoverySearch = (term: string) => catalogCall<{added: number; found: number}>('runDiscoverySearch', {term});
-export const listTelegramInbox = (cursor?: string) => catalogCall<Page<TelegramInboxItem>>('listTelegramInbox', {cursor});
+export const importSourceCandidates = (items: Array<Pick<SourceCandidate, 'title' | 'year' | 'banca' | 'orgao' | 'cargo' | 'url'>>) => discoveryCall<{added: number; existing: number}>('importSourceCandidates', {items});
+export const listSourceCandidates = (cursor?: string) => discoveryCall<Page<SourceCandidate>>('listSourceCandidates', {cursor});
+export const reviewSourceCandidate = (id: string, status: SourceCandidate['status']) => discoveryCall<{id: string}>('reviewSourceCandidate', {id, status});
+export const getDiscoverySettings = () => discoveryCall<DiscoverySettings>('getDiscoverySettings');
+export const saveDiscoverySettings = (enabled: boolean, terms: string[]) => discoveryCall<DiscoverySettings>('saveDiscoverySettings', {enabled, terms});
+export const runDiscoverySearch = (term: string) => discoveryCall<{added: number; found: number}>('runDiscoverySearch', {term});
+export const listTelegramInbox = (cursor?: string) => discoveryCall<Page<TelegramInboxItem>>('listTelegramInbox', {cursor});
 export type TelegramWebhookStatus = {connected: boolean; pending: number; lastError: string};
 async function telegramAdminCall<T>(functionName: 'configureTelegramWebhook' | 'telegramWebhookStatus'): Promise<T> {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Entre na conta de administrador.');
-  const response = await fetch(`https://us-central1-simulado-concurso-ia.cloudfunctions.net/${functionName}`, {method: 'POST', headers: {Authorization: `Bearer ${token}`}});
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = body && typeof body === 'object' && 'error' in body ? body.error : null;
-    const message = error && typeof error === 'object' && 'message' in error ? error.message : null;
-    throw new Error(typeof message === 'string' ? message : 'Não foi possível conectar o bot.');
-  }
-  if (!body || typeof body !== 'object' || !('data' in body)) throw new Error('Resposta inválida do Telegram.');
-  return body.data as T;
+  return discoveryCall<T>(functionName);
 }
 export const configureTelegramWebhook = () => telegramAdminCall<{connected: boolean}>('configureTelegramWebhook');
 export const getTelegramWebhookStatus = () => telegramAdminCall<TelegramWebhookStatus>('telegramWebhookStatus');
