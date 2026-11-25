@@ -8,7 +8,7 @@ import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'eslint.config.js', 'functions/', 'node_modules/'],
+    ignores: ['dist', 'eslint.config.js', 'functions/', 'supabase/functions/', 'node_modules/'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

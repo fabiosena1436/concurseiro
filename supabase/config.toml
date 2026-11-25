@@ -1,0 +1,4 @@
+project_id = "vgykwicsfguwlxztmiqp"
+
+[functions.discovery]
+verify_jwt = false # Firebase ID tokens are verified in the function using Google's JWKS.

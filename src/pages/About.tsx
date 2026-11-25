@@ -12,7 +12,7 @@ export const About: React.FC = () => {
           Bem-vindo ao <strong>Simulado Concurso</strong>, a sua plataforma definitiva para a preparação de concursos públicos. Nossa missão é fornecer as ferramentas mais eficazes e inovadoras para ajudar você a alcançar a aprovação dos seus sonhos.
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Com a ajuda da inteligência artificial, oferecemos simulados personalizados que se adaptam às suas necessidades de estudo, focando nas matérias e bancas examinadoras do seu interesse. Acreditamos que a prática leva à perfeição, e é por isso que nosso banco de questões é vasto e está sempre sendo atualizado.
+          Oferecemos provas anteriores em PDF e questões revisadas pelo administrador. Os simulados personalizados gerados por inteligência artificial continuam disponíveis como recurso separado e podem conter erros.
         </Typography>
         <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 4 }}>
           Nossa Visão

@@ -47,9 +47,26 @@ service cloud.firestore {
     }
 
     match /exams/{examId} {
-      allow create: if owner(request.resource.data.creatorId);
-      allow read, delete: if admin() || (signedIn() && resource.data.creatorId == request.auth.uid);
+      allow create: if false;
+      allow read: if admin() || (signedIn() && resource.data.creatorId == request.auth.uid);
+      allow delete: if false;
       allow update: if false;
+    }
+    match /papers/{paperId} {
+      allow read: if resource.data.status == 'published' || admin();
+      allow write: if false;
+    }
+    match /bankQuestions/{questionId} {
+      allow read: if resource.data.status == 'published' || admin();
+      allow write: if false;
+      match /revisions/{revisionId} {
+        allow read: if admin();
+        allow write: if false;
+      }
+    }
+    match /bankAttempts/{attemptId} {
+      allow read: if admin();
+      allow write: if false;
     }
   }
 }

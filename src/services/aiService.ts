@@ -17,8 +17,10 @@ export const generateQuestionsFromBank = async (
   difficulty: 'fundamental' | 'medio' | 'superior',
   editalContent?: string,
   existingQuestions?: { question: string }[],
-  specificContent?: string
-): Promise<Question[]> => {
+  specificContent?: string,
+  title?: string,
+  displayBanca?: string
+): Promise<{questions: Question[]; examId: string}> => {
   const user = auth.currentUser;
   if (!user) throw new Error('Você precisa entrar na sua conta para gerar questões.');
 
@@ -26,16 +28,16 @@ export const generateQuestionsFromBank = async (
   const response = await fetch(functionURL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ data: { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent } }),
+    body: JSON.stringify({ data: { subject, numQuestions, banca, difficulty, editalContent, existingQuestions, specificContent, title, displayBanca } }),
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) throw new Error(errorMessage(payload) ?? 'Não foi possível gerar questões agora. Tente novamente.');
-  if (!payload || typeof payload !== 'object' || !('data' in payload) || !Array.isArray(payload.data)) {
+  if (!payload || typeof payload !== 'object' || !('data' in payload) || !payload.data || typeof payload.data !== 'object' || !('questions' in payload.data) || !('examId' in payload.data) || !Array.isArray(payload.data.questions) || typeof payload.data.examId !== 'string') {
     throw new Error('A resposta da geração veio em um formato inesperado. Tente novamente.');
   }
-  const questions = payload.data as Question[];
+  const questions = payload.data.questions as Question[];
   if (questions.length !== numQuestions || questions.some(q => !q.question || !Array.isArray(q.options) || !Number.isInteger(q.correctAnswer) || q.correctAnswer < 0 || q.correctAnswer >= q.options.length)) {
     throw new Error('As questões geradas vieram incompletas. Tente novamente.');
   }
-  return questions;
+  return {questions, examId: payload.data.examId};
 };

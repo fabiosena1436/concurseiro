@@ -24,11 +24,13 @@ const Footer: React.FC = () => {
             <Link component={RouterLink} to="/about" sx={{ mx: 1 }}>
                 Sobre
             </Link>
+            <Link component={RouterLink} to="/provas" sx={{ mx: 1 }}>Provas</Link>
+            <Link component={RouterLink} to="/questoes" sx={{ mx: 1 }}>Questões</Link>
         </Box>
         <Typography variant="body2" color="text.secondary" align="center">
           {'Copyright © '}
           <Link color="inherit" component={RouterLink} to="/">
-            Simulado Concurso
+            Concurseiro
           </Link>{' '}
           {new Date().getFullYear()}
           {'.'}

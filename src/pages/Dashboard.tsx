@@ -144,6 +144,7 @@ export const Dashboard: React.FC = () => {
         ].map(metric => <Grid key={metric.label} size={{ xs: 12, sm: 4 }}><Card sx={{ height: '100%' }}><CardContent><Typography variant="body2" color="text.secondary">{metric.label}</Typography><Typography variant="h4" color="primary" sx={{ mt: 1 }}>{metric.value}</Typography></CardContent></Card></Grid>)}
       </Grid>
       <Button component={Link} to="/criar-simulado" variant="contained" sx={{ mb: 3 }}>Criar novo simulado</Button>
+      <Button component={Link} to="/treinos" sx={{mb: 3, ml: 1}}>Histórico de treinos revisados</Button>
 
       {results.length > 0 && (
         <Grid container spacing={2} sx={{ mb: 3 }}>
